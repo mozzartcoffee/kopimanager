@@ -33,7 +33,7 @@
             <form id="login-form" class="space-y-4">
                 <div class="relative">
                     <i data-lucide="user" class="absolute left-4 top-4 text-stone-400 w-5 h-5"></i>
-                    <input type="email" id="email" class="w-full pl-12 pr-4 py-4 bg-stone-50 border rounded-2xl outline-none focus:ring-2 focus:ring-amber-500" placeholder="admin@kopi.com" required>
+                    <input type="email" id="email" class="w-full pl-12 pr-4 py-4 bg-stone-50 border rounded-2xl outline-none focus:ring-2 focus:ring-amber-500" placeholder="Masukkan Email Anda" required>
                 </div>
                 <div class="relative">
                     <i data-lucide="lock" class="absolute left-4 top-4 text-stone-400 w-5 h-5"></i>
@@ -44,7 +44,6 @@
                     Masuk <i data-lucide="arrow-right" class="w-5 h-5"></i>
                 </button>
             </form>
-            <p class="text-center mt-8 text-stone-400 text-[10px] uppercase font-bold tracking-widest">Demo: admin@kopi.com / admin123</p>
         </div>
     </div>
 
@@ -81,11 +80,9 @@
 
     <script>
         // --- KONFIGURASI SUPABASE ---
-        // Ganti dengan URL dan Anon Key dari dashboard Supabase Anda
         const SUPABASE_URL = 'https://wvidkpxauvadjykrksan.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind2aWRrcHhhdXZhZGp5a3Jrc2FuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2ODk4ODAsImV4cCI6MjA4NzI2NTg4MH0.hhUVmvDs690jFF6osVyYBeIcaPaROtJV1tEA1QUb-GY';
         
-        // Memperbaiki bentrok variabel dengan mengubah nama instance menjadi supabaseClient
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         // --- APP STATE ---
@@ -94,7 +91,6 @@
             activeTab: 'dashboard',
             reportFilter: 'daily',
             editingVariantId: null,
-            // Data dikosongkan karena akan ditarik dari database
             ingredients: [],
             assets: [],
             opsCosts: [],
@@ -106,7 +102,6 @@
         // --- FETCH DATA DARI SUPABASE ---
         async function loadDataFromSupabase() {
             try {
-                // Menarik semua data secara paralel agar loading cepat
                 const [ingRes, astRes, opsRes, varRes, saleRes, setRes] = await Promise.all([
                     supabaseClient.from('ingredients').select('*').order('id'),
                     supabaseClient.from('assets').select('*').order('id'),
@@ -145,7 +140,7 @@
         }
 
         // --- DATA HANDLERS ---
-        async function addSale(variantId) {
+        function addSale(variantId) {
             const v = state.variants.find(x => x.id === variantId);
             const variantHPPInfo = calculateVariantMetrics(v);
             
@@ -158,8 +153,8 @@
                 date: new Date().toLocaleTimeString('id-ID')
             };
             
-            // Simpan transaksi ke database
-            await supabaseClient.from('sales').insert([newSale]);
+            // Simpan transaksi secara Optimistic (Background)
+            supabaseClient.from('sales').insert([newSale]).then();
             
             state.sales.unshift(newSale);
             render();
@@ -168,7 +163,6 @@
         // --- CALCULATIONS ---
         function calculateMonthlyAssetDepreciation() {
             return state.assets.reduce((acc, curr) => {
-                // Depresiasi per bulan = Harga / (Tahun * 12)
                 return acc + (curr.cost / (curr.lifeYears * 12));
             }, 0);
         }
@@ -229,7 +223,6 @@
             });
 
             const avgMargin = totalMargin / state.variants.length;
-            // BEP (Unit) = Total Biaya Tetap / Margin Rata-rata per Unit
             const bepUnits = avgMargin > 0 ? Math.ceil(totalFixedCosts / avgMargin) : Infinity;
 
             return { bepUnits, avgMargin, fixedCosts: totalFixedCosts };
@@ -237,6 +230,9 @@
 
         // --- RENDER ENGINE ---
         function render() {
+            // FIX: Simpan ID elemen yang sedang aktif (fokus) agar tidak mereset kursor saat mengetik
+            const activeElementId = document.activeElement ? document.activeElement.id : null;
+
             const content = document.getElementById('tab-content');
             
             document.querySelectorAll('.nav-btn').forEach(btn => {
@@ -244,8 +240,10 @@
                 btn.classList.add('text-stone-400');
             });
             const activeBtn = document.getElementById(`btn-${state.activeTab}`);
-            activeBtn.classList.remove('text-stone-400');
-            activeBtn.classList.add('bg-white', 'text-amber-800', 'shadow-sm');
+            if(activeBtn) {
+                activeBtn.classList.remove('text-stone-400');
+                activeBtn.classList.add('bg-white', 'text-amber-800', 'shadow-sm');
+            }
 
             if (state.activeTab === 'dashboard') renderDashboard(content);
             if (state.activeTab === 'pengaturan') renderPengaturan(content);
@@ -253,6 +251,14 @@
             if (state.activeTab === 'laporan') renderLaporan(content);
 
             lucide.createIcons();
+
+            // FIX: Kembalikan fokus ke elemen setelah layar digambar ulang
+            if (activeElementId) {
+                const elToFocus = document.getElementById(activeElementId);
+                if (elToFocus) {
+                    elToFocus.focus();
+                }
+            }
         }
 
         function renderDashboard(el) {
@@ -384,7 +390,6 @@
             const ingredientCosts = reportData.reduce((a, b) => a + b.recordedIngredientCost, 0);
             const netProfit = revenue - ingredientCosts - allocatedOverhead - allocatedDepreciation;
 
-            // Target BEP berdasarkan filter periode
             const bepMetrics = calculateBEPMetrics();
             let bepTarget = bepMetrics.bepUnits;
             if (state.reportFilter === 'daily') bepTarget = Math.ceil(bepMetrics.bepUnits / 30);
@@ -473,6 +478,7 @@
         function renderPengaturan(el) {
             const currentVariant = state.variants.find(v => v.id === state.editingVariantId);
             
+            // FIX: Tambahkan ID unik pada semua tag <input> agar fokus tidak hilang saat tab
             el.innerHTML = `
                 <div class="space-y-8 animate-fade-in">
                     <!-- 1. GUDANG -->
@@ -485,7 +491,7 @@
                             ${state.ingredients.map(ing => `
                                 <div class="p-4 bg-stone-50 rounded-2xl border border-stone-100 flex flex-col gap-3">
                                     <div class="flex justify-between items-center">
-                                        <input class="bg-transparent font-black text-sm w-full outline-none text-stone-800" value="${ing.name}" onchange="updateIng(${ing.id}, 'name', this.value)" placeholder="Nama Bahan Baku">
+                                        <input id="ing-name-${ing.id}" class="bg-transparent font-black text-sm w-full outline-none text-stone-800" value="${ing.name}" onchange="updateIng(${ing.id}, 'name', this.value)" placeholder="Nama Bahan Baku">
                                         <button onclick="delIng(${ing.id})" class="text-red-300 hover:text-red-500 ml-2"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                                     </div>
                                     <div class="grid grid-cols-2 gap-3">
@@ -493,14 +499,14 @@
                                             <label class="text-[9px] font-black text-stone-400 uppercase tracking-widest">Harga Beli Total</label>
                                             <div class="flex items-center gap-1 bg-white px-2 py-1.5 rounded-lg border border-stone-200">
                                                 <span class="text-[10px] text-stone-400 font-bold">Rp</span>
-                                                <input class="w-full text-xs font-bold outline-none" type="number" value="${ing.cost}" onchange="updateIng(${ing.id}, 'cost', parseFloat(this.value))">
+                                                <input id="ing-cost-${ing.id}" class="w-full text-xs font-bold outline-none" type="number" value="${ing.cost}" onchange="updateIng(${ing.id}, 'cost', parseFloat(this.value))">
                                             </div>
                                         </div>
                                         <div class="flex flex-col gap-1">
                                             <label class="text-[9px] font-black text-stone-400 uppercase tracking-widest">Jumlah & Satuan</label>
                                             <div class="flex items-center gap-1 bg-white px-2 py-1.5 rounded-lg border border-stone-200">
-                                                <input class="w-full text-xs font-bold outline-none text-right" type="number" value="${ing.bulkAmount}" onchange="updateIng(${ing.id}, 'bulkAmount', parseFloat(this.value))">
-                                                <select class="text-[10px] bg-transparent font-bold outline-none border-l pl-1 text-amber-700" onchange="updateIng(${ing.id}, 'unit', this.value)">
+                                                <input id="ing-bulk-${ing.id}" class="w-full text-xs font-bold outline-none text-right" type="number" value="${ing.bulkAmount}" onchange="updateIng(${ing.id}, 'bulkAmount', parseFloat(this.value))">
+                                                <select id="ing-unit-${ing.id}" class="text-[10px] bg-transparent font-bold outline-none border-l pl-1 text-amber-700" onchange="updateIng(${ing.id}, 'unit', this.value)">
                                                     <option value="g" ${ing.unit === 'g' ? 'selected' : ''}>g</option>
                                                     <option value="ml" ${ing.unit === 'ml' ? 'selected' : ''}>ml</option>
                                                     <option value="pcs" ${ing.unit === 'pcs' ? 'selected' : ''}>pcs</option>
@@ -517,7 +523,7 @@
                         </div>
                     </section>
 
-                    <!-- 2. ASET TETAP (NEW) -->
+                    <!-- 2. ASET TETAP -->
                     <section class="bg-white p-8 rounded-[32px] border border-stone-100 shadow-sm">
                         <div class="flex justify-between items-center mb-6">
                             <div><h3 class="text-xl font-black flex items-center gap-2"><i data-lucide="package" class="text-amber-600"></i> 2. Aset Tetap & Peralatan</h3><p class="text-xs text-stone-400">Peralatan jangka panjang (Biaya penyusutan dihitung otomatis)</p></div>
@@ -527,17 +533,17 @@
                             ${state.assets.map(asset => `
                                 <div class="p-4 bg-stone-50 rounded-2xl border border-stone-100 space-y-3">
                                     <div class="flex justify-between">
-                                        <input class="bg-transparent font-bold text-sm" value="${asset.name}" onchange="updateAsset(${asset.id}, 'name', this.value)">
-                                        <button onclick="delAsset(${asset.id})" class="text-red-300"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                        <input id="ast-name-${asset.id}" class="bg-transparent font-bold text-sm outline-none w-full" value="${asset.name}" onchange="updateAsset(${asset.id}, 'name', this.value)">
+                                        <button onclick="delAsset(${asset.id})" class="text-red-300 hover:text-red-500"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                                     </div>
                                     <div class="grid grid-cols-2 gap-2">
                                         <div>
                                             <label class="text-[8px] font-black text-stone-400">HARGA BELI</label>
-                                            <input class="w-full bg-white p-1 rounded border text-xs font-bold" type="number" value="${asset.cost}" onchange="updateAsset(${asset.id}, 'cost', parseFloat(this.value))">
+                                            <input id="ast-cost-${asset.id}" class="w-full bg-white p-1 rounded border text-xs font-bold outline-none" type="number" value="${asset.cost}" onchange="updateAsset(${asset.id}, 'cost', parseFloat(this.value))">
                                         </div>
                                         <div>
                                             <label class="text-[8px] font-black text-stone-400">MASA PAKAI (THN)</label>
-                                            <input class="w-full bg-white p-1 rounded border text-xs font-bold" type="number" value="${asset.lifeYears}" onchange="updateAsset(${asset.id}, 'lifeYears', parseFloat(this.value))">
+                                            <input id="ast-life-${asset.id}" class="w-full bg-white p-1 rounded border text-xs font-bold outline-none" type="number" value="${asset.lifeYears}" onchange="updateAsset(${asset.id}, 'lifeYears', parseFloat(this.value))">
                                         </div>
                                     </div>
                                     <div class="pt-2 border-t flex justify-between">
@@ -557,18 +563,18 @@
                         <div class="grid md:grid-cols-3 gap-6">
                             <div class="bg-amber-50 p-6 rounded-2xl border border-amber-100">
                                 <label class="text-[10px] font-black text-amber-800 uppercase tracking-widest block mb-2">Target Produksi (btl/bln)</label>
-                                <input type="number" class="w-full bg-white p-3 rounded-xl border border-amber-200 text-2xl font-black text-amber-900 outline-none" value="${state.targetQty}" onchange="updateTargetQty(this.value)">
+                                <input id="target-qty" type="number" class="w-full bg-white p-3 rounded-xl border border-amber-200 text-2xl font-black text-amber-900 outline-none" value="${state.targetQty}" onchange="updateTargetQty(this.value)">
                             </div>
                             <div class="md:col-span-2 space-y-3">
                                 <label class="text-[10px] font-black text-stone-400 uppercase tracking-widest block mb-1">Rincian Overhead (Sewa, Gaji, dsb)</label>
                                 ${state.opsCosts.map(ops => `
                                     <div class="flex gap-2">
-                                        <input class="flex-1 p-3 bg-stone-50 border rounded-xl text-xs font-bold outline-none" value="${ops.name}" onchange="updateOpsCost(${ops.id}, 'name', this.value)">
+                                        <input id="ops-name-${ops.id}" class="flex-1 p-3 bg-stone-50 border rounded-xl text-xs font-bold outline-none" value="${ops.name}" onchange="updateOpsCost(${ops.id}, 'name', this.value)">
                                         <div class="relative w-32">
                                             <span class="absolute left-3 top-3 text-[10px] text-stone-400">Rp</span>
-                                            <input type="number" class="w-full pl-8 pr-3 py-3 bg-stone-50 border rounded-xl text-xs font-black outline-none" value="${ops.monthly}" onchange="updateOpsCost(${ops.id}, 'monthly', parseFloat(this.value))">
+                                            <input id="ops-monthly-${ops.id}" type="number" class="w-full pl-8 pr-3 py-3 bg-stone-50 border rounded-xl text-xs font-black outline-none" value="${ops.monthly}" onchange="updateOpsCost(${ops.id}, 'monthly', parseFloat(this.value))">
                                         </div>
-                                        <button onclick="delOps(${ops.id})" class="p-2 text-red-300"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                        <button onclick="delOps(${ops.id})" class="p-2 text-red-300 hover:text-red-500"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                                     </div>
                                 `).join('')}
                                 <button onclick="addOps()" class="text-xs font-bold text-amber-700 flex items-center gap-1 mt-2">+ Tambah Overhead</button>
@@ -597,8 +603,8 @@
                                 <div class="bg-white p-8 rounded-[32px] border border-stone-100 shadow-sm space-y-6">
                                     <h3 class="text-xl font-black">Edit Komposisi: ${currentVariant.name}</h3>
                                     <div class="grid grid-cols-2 gap-4">
-                                        <div class="bg-stone-50 p-3 rounded-xl"><label class="text-[10px] font-black text-stone-400 uppercase">Nama</label><input class="w-full bg-transparent font-bold outline-none" value="${currentVariant.name}" onchange="updateVar(${currentVariant.id}, 'name', this.value)"></div>
-                                        <div class="bg-stone-50 p-3 rounded-xl"><label class="text-[10px] font-black text-stone-400 uppercase">Harga</label><input class="w-full bg-transparent font-bold text-amber-700 outline-none" type="number" value="${currentVariant.price}" onchange="updateVar(${currentVariant.id}, 'price', parseInt(this.value))"></div>
+                                        <div class="bg-stone-50 p-3 rounded-xl"><label class="text-[10px] font-black text-stone-400 uppercase">Nama</label><input id="var-name-${currentVariant.id}" class="w-full bg-transparent font-bold outline-none" value="${currentVariant.name}" onchange="updateVar(${currentVariant.id}, 'name', this.value)"></div>
+                                        <div class="bg-stone-50 p-3 rounded-xl"><label class="text-[10px] font-black text-stone-400 uppercase">Harga</label><input id="var-price-${currentVariant.id}" class="w-full bg-transparent font-bold text-amber-700 outline-none" type="number" value="${currentVariant.price}" onchange="updateVar(${currentVariant.id}, 'price', parseInt(this.value))"></div>
                                     </div>
                                     <div class="space-y-3">
                                         <p class="text-[10px] font-black text-stone-400 uppercase tracking-widest">Resep per Botol</p>
@@ -607,9 +613,9 @@
                                                 const recipe = currentVariant.recipe.find(r => r.ingId === ing.id);
                                                 return `
                                                     <div class="flex items-center justify-between p-3 bg-stone-50 rounded-2xl border border-stone-100">
-                                                        <span class="text-xs font-bold text-stone-600">${ing.name}</span>
+                                                        <span class="text-xs font-bold text-stone-600 truncate mr-2" title="${ing.name}">${ing.name}</span>
                                                         <div class="flex items-center gap-2">
-                                                            <input class="w-16 p-2 border rounded-lg text-center font-black text-amber-900 text-xs" type="number" value="${recipe ? recipe.qty : ''}" placeholder="0" onchange="updateRecipe(${currentVariant.id}, ${ing.id}, this.value)">
+                                                            <input id="rec-${currentVariant.id}-ing-${ing.id}" class="w-16 p-2 border rounded-lg text-center font-black text-amber-900 text-xs outline-none" type="number" value="${recipe ? recipe.qty : ''}" placeholder="0" onchange="updateRecipe(${currentVariant.id}, ${ing.id}, this.value)">
                                                             <span class="text-[9px] font-bold text-stone-400 uppercase w-4">${ing.unit}</span>
                                                         </div>
                                                     </div>
@@ -629,88 +635,89 @@
             `;
         }
 
-        // --- CRUD HELPERS ---
-        window.addIngredient = async () => {
+        // --- CRUD HELPERS (OPTIMISTIC UPDATES) ---
+        // FIX: Hapus sistem menunggu (await) saat input data ke Supabase agar UI responsif seketika.
+        window.addIngredient = () => {
             const newItem = { id: Date.now(), name: 'Bahan Baru', cost: 0, bulkAmount: 1000, unit: 'g' };
-            await supabaseClient.from('ingredients').insert([newItem]);
+            supabaseClient.from('ingredients').insert([newItem]).then();
             state.ingredients.push(newItem);
             render();
         };
-        window.updateIng = async (id, f, v) => {
-            await supabaseClient.from('ingredients').update({ [f]: v }).eq('id', id);
+        window.updateIng = (id, f, v) => {
+            supabaseClient.from('ingredients').update({ [f]: v }).eq('id', id).then();
             const i = state.ingredients.find(x => x.id === id);
             if (i) i[f] = v;
             render();
         };
-        window.delIng = async (id) => {
-            await supabaseClient.from('ingredients').delete().eq('id', id);
+        window.delIng = (id) => {
+            supabaseClient.from('ingredients').delete().eq('id', id).then();
             state.ingredients = state.ingredients.filter(x => x.id !== id);
             render();
         };
         
-        window.addAsset = async () => {
+        window.addAsset = () => {
             const newItem = { id: Date.now(), name: 'Aset Baru', cost: 0, lifeYears: 5 };
-            await supabaseClient.from('assets').insert([newItem]);
+            supabaseClient.from('assets').insert([newItem]).then();
             state.assets.push(newItem);
             render();
         };
-        window.updateAsset = async (id, f, v) => {
-            await supabaseClient.from('assets').update({ [f]: v }).eq('id', id);
+        window.updateAsset = (id, f, v) => {
+            supabaseClient.from('assets').update({ [f]: v }).eq('id', id).then();
             const a = state.assets.find(x => x.id === id);
             if (a) a[f] = v;
             render();
         };
-        window.delAsset = async (id) => {
-            await supabaseClient.from('assets').delete().eq('id', id);
+        window.delAsset = (id) => {
+            supabaseClient.from('assets').delete().eq('id', id).then();
             state.assets = state.assets.filter(x => x.id !== id);
             render();
         };
 
-        window.addVariant = async () => {
+        window.addVariant = () => {
             const nid = Date.now();
             const newItem = { id: nid, name: 'Varian Baru', price: 0, recipe: [] };
-            await supabaseClient.from('variants').insert([newItem]);
+            supabaseClient.from('variants').insert([newItem]).then();
             state.variants.push(newItem);
             state.editingVariantId = nid;
             render();
         };
-        window.updateVar = async (id, f, v) => {
-            await supabaseClient.from('variants').update({ [f]: v }).eq('id', id);
+        window.updateVar = (id, f, v) => {
+            supabaseClient.from('variants').update({ [f]: v }).eq('id', id).then();
             const x = state.variants.find(y => y.id === id);
             if (x) x[f] = v;
             render();
         };
-        window.updateRecipe = async (vid, iid, qty) => {
+        window.updateRecipe = (vid, iid, qty) => {
             const v = state.variants.find(x => x.id === vid);
             if (v) {
                 const other = v.recipe.filter(r => r.ingId !== iid);
                 const q = parseFloat(qty);
                 const newRecipe = q > 0 ? [...other, { ingId: iid, qty: q }] : other;
-                await supabaseClient.from('variants').update({ recipe: newRecipe }).eq('id', vid);
+                supabaseClient.from('variants').update({ recipe: newRecipe }).eq('id', vid).then();
                 v.recipe = newRecipe;
             }
             render();
         };
-        window.updateTargetQty = async (val) => {
+        window.updateTargetQty = (val) => {
             const newQty = parseInt(val) || 1;
-            await supabaseClient.from('settings').update({ targetQty: newQty }).eq('id', 1);
+            supabaseClient.from('settings').update({ targetQty: newQty }).eq('id', 1).then();
             state.targetQty = newQty;
             render();
         };
-        window.addOps = async () => {
+        window.addOps = () => {
             const newItem = { id: Date.now(), name: 'Biaya Baru', monthly: 0 };
-            await supabaseClient.from('ops_costs').insert([newItem]);
+            supabaseClient.from('ops_costs').insert([newItem]).then();
             state.opsCosts.push(newItem);
             render();
         };
-        window.updateOpsCost = async (id, f, v) => {
-            await supabaseClient.from('ops_costs').update({ [f]: v }).eq('id', id);
+        window.updateOpsCost = (id, f, v) => {
+            supabaseClient.from('ops_costs').update({ [f]: v }).eq('id', id).then();
             const o = state.opsCosts.find(x => x.id === id);
             if (o) o[f] = v;
             render();
         };
-        window.delOps = async (id) => {
-            await supabaseClient.from('ops_costs').delete().eq('id', id);
+        window.delOps = (id) => {
+            supabaseClient.from('ops_costs').delete().eq('id', id).then();
             state.opsCosts = state.opsCosts.filter(x => x.id !== id);
             render();
         };
@@ -720,12 +727,12 @@
             e.preventDefault();
             const em = document.getElementById('email').value;
             const pw = document.getElementById('password').value;
-            if (em === 'admin@kopi.com' && pw === 'admin123') {
+            
+            if (em === 'ruang.mozzart@gmail.com' && pw === 'R4h45i4ku') {
                 const btn = e.target.querySelector('button');
                 const origHtml = btn.innerHTML;
                 btn.innerHTML = 'Memuat Data Cloud...';
                 
-                // Fetch dari cloud supabase ketika berhasil login
                 await loadDataFromSupabase();
                 
                 state.isLoggedIn = true;
