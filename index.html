@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KopiManager Pro - Sistem Manajerial Kopi Botolan</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Tambahkan Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .animate-fade-in { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="bg-[#fcfaf7] text-stone-800">
+
+    <!-- LOGIN OVERLAY -->
+    <div id="login-screen" class="min-h-screen flex items-center justify-center p-4">
+        <div class="max-w-md w-full bg-white p-8 rounded-[32px] shadow-xl border border-stone-100 animate-fade-in">
+            <div class="text-center mb-8">
+                <div class="w-16 h-16 bg-amber-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <i data-lucide="coffee" class="text-amber-800 w-8 h-8"></i>
+                </div>
+                <h1 class="text-3xl font-black text-stone-900 tracking-tight">KopiManager<span class="text-amber-600">.</span></h1>
+                <p class="text-stone-400 text-sm mt-2">Sistem Manajerial Kopi Botolan</p>
+            </div>
+            <form id="login-form" class="space-y-4">
+                <div class="relative">
+                    <i data-lucide="user" class="absolute left-4 top-4 text-stone-400 w-5 h-5"></i>
+                    <input type="email" id="email" class="w-full pl-12 pr-4 py-4 bg-stone-50 border rounded-2xl outline-none focus:ring-2 focus:ring-amber-500" placeholder="admin@kopi.com" required>
+                </div>
+                <div class="relative">
+                    <i data-lucide="lock" class="absolute left-4 top-4 text-stone-400 w-5 h-5"></i>
+                    <input type="password" id="password" class="w-full pl-12 pr-4 py-4 bg-stone-50 border rounded-2xl outline-none focus:ring-2 focus:ring-amber-500" placeholder="Password" required>
+                </div>
+                <p id="login-error" class="text-red-500 text-xs font-bold px-2 hidden">Email atau password salah.</p>
+                <button type="submit" class="w-full bg-amber-800 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 hover:bg-amber-900 transition-all shadow-lg active:scale-95">
+                    Masuk <i data-lucide="arrow-right" class="w-5 h-5"></i>
+                </button>
+            </form>
+            <p class="text-center mt-8 text-stone-400 text-[10px] uppercase font-bold tracking-widest">Demo: admin@kopi.com / admin123</p>
+        </div>
+    </div>
+
+    <!-- MAIN APP -->
+    <div id="app-screen" class="hidden">
+        <header class="max-w-6xl mx-auto p-4 md:p-8 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div>
+                <h1 class="text-2xl font-black flex items-center gap-2 tracking-tight">
+                    <i data-lucide="coffee" class="text-amber-800 w-6 h-6"></i> KopiManager<span class="text-amber-600">.</span>
+                </h1>
+                <p class="text-stone-400 text-sm font-medium">Laporan Laba Rugi Akurat</p>
+            </div>
+            <nav class="flex bg-stone-100 p-1 rounded-xl overflow-x-auto no-scrollbar max-w-full">
+                <button onclick="switchTab('dashboard')" class="nav-btn px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all" id="btn-dashboard">
+                    <i data-lucide="trending-up" class="w-4 h-4"></i> Panel
+                </button>
+                <button onclick="switchTab('pengaturan')" class="nav-btn px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all" id="btn-pengaturan">
+                    <i data-lucide="settings" class="w-4 h-4"></i> Resep & Aset
+                </button>
+                <button onclick="switchTab('transaksi')" class="nav-btn px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all" id="btn-transaksi">
+                    <i data-lucide="shopping-cart" class="w-4 h-4"></i> Jual
+                </button>
+                <button onclick="switchTab('laporan')" class="nav-btn px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all" id="btn-laporan">
+                    <i data-lucide="file-text" class="w-4 h-4"></i> Laporan
+                </button>
+                <button onclick="logout()" class="px-4 py-2 text-stone-400 hover:text-red-500"><i data-lucide="log-out" class="w-4 h-4"></i></button>
+            </nav>
+        </header>
+
+        <main class="max-w-6xl mx-auto px-4 md:px-8 pb-12">
+            <div id="tab-content"></div>
+        </main>
+    </div>
+
+    <script>
+        // --- KONFIGURASI SUPABASE ---
+        // Ganti dengan URL dan Anon Key dari dashboard Supabase Anda
+        const SUPABASE_URL = 'https://wvidkpxauvadjykrksan.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind2aWRrcHhhdXZhZGp5a3Jrc2FuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2ODk4ODAsImV4cCI6MjA4NzI2NTg4MH0.hhUVmvDs690jFF6osVyYBeIcaPaROtJV1tEA1QUb-GY';
+        
+        // Memperbaiki bentrok variabel dengan mengubah nama instance menjadi supabaseClient
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // --- APP STATE ---
+        let state = {
+            isLoggedIn: false,
+            activeTab: 'dashboard',
+            reportFilter: 'daily',
+            editingVariantId: null,
+            // Data dikosongkan karena akan ditarik dari database
+            ingredients: [],
+            assets: [],
+            opsCosts: [],
+            targetQty: 500,
+            variants: [],
+            sales: []
+        };
+
+        // --- FETCH DATA DARI SUPABASE ---
+        async function loadDataFromSupabase() {
+            try {
+                // Menarik semua data secara paralel agar loading cepat
+                const [ingRes, astRes, opsRes, varRes, saleRes, setRes] = await Promise.all([
+                    supabaseClient.from('ingredients').select('*').order('id'),
+                    supabaseClient.from('assets').select('*').order('id'),
+                    supabaseClient.from('ops_costs').select('*').order('id'),
+                    supabaseClient.from('variants').select('*').order('id'),
+                    supabaseClient.from('sales').select('*').order('timestamp', { ascending: false }),
+                    supabaseClient.from('settings').select('*').eq('id', 1).single()
+                ]);
+
+                if (ingRes.data) state.ingredients = ingRes.data;
+                if (astRes.data) state.assets = astRes.data;
+                if (opsRes.data) state.opsCosts = opsRes.data;
+                if (varRes.data) state.variants = varRes.data;
+                if (saleRes.data) state.sales = saleRes.data;
+                if (setRes.data) state.targetQty = setRes.data.targetQty;
+            } catch (error) {
+                console.error("Gagal mengambil data dari Supabase:", error);
+                alert("Gagal terhubung ke database Supabase.");
+            }
+        }
+
+        // --- CORE FUNCTIONS ---
+        function formatIDR(num) {
+            return "Rp " + Math.round(num).toLocaleString('id-ID');
+        }
+
+        function switchTab(tab) {
+            state.activeTab = tab;
+            render();
+        }
+
+        function logout() {
+            state.isLoggedIn = false;
+            document.getElementById('login-screen').classList.remove('hidden');
+            document.getElementById('app-screen').classList.add('hidden');
+        }
+
+        // --- DATA HANDLERS ---
+        async function addSale(variantId) {
+            const v = state.variants.find(x => x.id === variantId);
+            const variantHPPInfo = calculateVariantMetrics(v);
+            
+            const newSale = {
+                id: Date.now(),
+                name: v.name,
+                price: v.price,
+                recordedIngredientCost: variantHPPInfo.ingredientCostOnly,
+                timestamp: new Date().toISOString(),
+                date: new Date().toLocaleTimeString('id-ID')
+            };
+            
+            // Simpan transaksi ke database
+            await supabaseClient.from('sales').insert([newSale]);
+            
+            state.sales.unshift(newSale);
+            render();
+        }
+
+        // --- CALCULATIONS ---
+        function calculateMonthlyAssetDepreciation() {
+            return state.assets.reduce((acc, curr) => {
+                // Depresiasi per bulan = Harga / (Tahun * 12)
+                return acc + (curr.cost / (curr.lifeYears * 12));
+            }, 0);
+        }
+
+        function calculateTotalMonthlyOverhead() {
+            return state.opsCosts.reduce((acc, curr) => acc + curr.monthly, 0);
+        }
+
+        function calculateVariantMetrics(variant) {
+            let ingredientCostOnly = 0;
+            variant.recipe.forEach(r => {
+                const ing = state.ingredients.find(i => i.id === r.ingId);
+                if (ing) {
+                    ingredientCostOnly += (ing.cost / ing.bulkAmount) * r.qty;
+                }
+            });
+
+            const monthlyDepreciation = calculateMonthlyAssetDepreciation();
+            const monthlyOverhead = calculateTotalMonthlyOverhead();
+            const totalMonthlyFixedCosts = monthlyDepreciation + monthlyOverhead;
+            
+            const fixedCostPerUnit = totalMonthlyFixedCosts / state.targetQty;
+            
+            let maxCanProduce = Infinity;
+            if (variant.recipe.length === 0) maxCanProduce = 0;
+            variant.recipe.forEach(r => {
+                const ing = state.ingredients.find(i => i.id === r.ingId);
+                if (ing && r.qty > 0) {
+                    const possible = Math.floor(ing.bulkAmount / r.qty);
+                    if (possible < maxCanProduce) maxCanProduce = possible;
+                }
+            });
+
+            return {
+                ingredientCostOnly,
+                depreciationPerUnit: monthlyDepreciation / state.targetQty,
+                overheadPerUnit: monthlyOverhead / state.targetQty,
+                totalHpp: ingredientCostOnly + fixedCostPerUnit,
+                maxCanProduce: maxCanProduce === Infinity ? 0 : maxCanProduce
+            };
+        }
+
+        function calculateBEPMetrics() {
+            const monthlyOverhead = calculateTotalMonthlyOverhead();
+            const monthlyDepreciation = calculateMonthlyAssetDepreciation();
+            const totalFixedCosts = monthlyOverhead + monthlyDepreciation;
+
+            if (state.variants.length === 0) return { bepUnits: 0, avgMargin: 0, fixedCosts: totalFixedCosts };
+
+            let totalMargin = 0;
+            state.variants.forEach(v => {
+                let ingredientCost = 0;
+                v.recipe.forEach(r => {
+                    const ing = state.ingredients.find(i => i.id === r.ingId);
+                    if (ing) ingredientCost += (ing.cost / ing.bulkAmount) * r.qty;
+                });
+                totalMargin += (v.price - ingredientCost);
+            });
+
+            const avgMargin = totalMargin / state.variants.length;
+            // BEP (Unit) = Total Biaya Tetap / Margin Rata-rata per Unit
+            const bepUnits = avgMargin > 0 ? Math.ceil(totalFixedCosts / avgMargin) : Infinity;
+
+            return { bepUnits, avgMargin, fixedCosts: totalFixedCosts };
+        }
+
+        // --- RENDER ENGINE ---
+        function render() {
+            const content = document.getElementById('tab-content');
+            
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('bg-white', 'text-amber-800', 'shadow-sm');
+                btn.classList.add('text-stone-400');
+            });
+            const activeBtn = document.getElementById(`btn-${state.activeTab}`);
+            activeBtn.classList.remove('text-stone-400');
+            activeBtn.classList.add('bg-white', 'text-amber-800', 'shadow-sm');
+
+            if (state.activeTab === 'dashboard') renderDashboard(content);
+            if (state.activeTab === 'pengaturan') renderPengaturan(content);
+            if (state.activeTab === 'transaksi') renderTransaksi(content);
+            if (state.activeTab === 'laporan') renderLaporan(content);
+
+            lucide.createIcons();
+        }
+
+        function renderDashboard(el) {
+            const monthlyOverhead = calculateTotalMonthlyOverhead();
+            const monthlyDepreciation = calculateMonthlyAssetDepreciation();
+            const totalOmzet = state.sales.reduce((a, b) => a + b.price, 0);
+            
+            const bepMetrics = calculateBEPMetrics();
+            const bepDisplay = bepMetrics.bepUnits === Infinity ? 'N/A' : bepMetrics.bepUnits;
+
+            el.innerHTML = `
+                <div class="space-y-6 animate-fade-in">
+                    <div class="grid grid-cols-1 md:grid-cols-5 gap-6">
+                        <div class="bg-white p-6 rounded-3xl border border-stone-100 shadow-sm">
+                            <p class="text-stone-400 text-[10px] font-black uppercase tracking-widest mb-1">Total Omzet</p>
+                            <h3 class="text-2xl font-black">${formatIDR(totalOmzet)}</h3>
+                        </div>
+                        <div class="bg-white p-6 rounded-3xl border border-stone-100 shadow-sm">
+                            <p class="text-stone-400 text-[10px] font-black uppercase tracking-widest mb-1">Overhead/Bulan</p>
+                            <h3 class="text-2xl font-black text-red-600">${formatIDR(monthlyOverhead)}</h3>
+                        </div>
+                        <div class="bg-white p-6 rounded-3xl border border-stone-100 shadow-sm">
+                            <p class="text-stone-400 text-[10px] font-black uppercase tracking-widest mb-1">Penyusutan Aset</p>
+                            <h3 class="text-2xl font-black text-amber-600">${formatIDR(monthlyDepreciation)}</h3>
+                        </div>
+                        <div class="bg-indigo-50 p-6 rounded-3xl border border-indigo-100 shadow-sm">
+                            <p class="text-indigo-400 text-[10px] font-black uppercase tracking-widest mb-1">Target BEP</p>
+                            <h3 class="text-2xl font-black text-indigo-700">${bepDisplay} <span class="text-sm font-normal">Btl</span></h3>
+                        </div>
+                        <div class="bg-amber-800 p-6 rounded-3xl text-white shadow-lg">
+                            <p class="text-amber-200 text-[10px] font-black uppercase tracking-widest mb-1">Target Produksi</p>
+                            <h3 class="text-2xl font-black">${state.targetQty} <span class="text-sm font-normal">Btl</span></h3>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-8 rounded-[32px] border border-stone-100 shadow-sm">
+                        <h3 class="font-bold mb-6 flex items-center gap-2"><i data-lucide="refresh-cw" class="text-amber-600 w-5 h-5"></i> Estimasi HPP Lengkap (Bahan + Depresiasi + Overhead)</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            ${state.variants.map(v => {
+                                const m = calculateVariantMetrics(v);
+                                return `
+                                    <div class="p-5 bg-stone-50 rounded-2xl border border-stone-100">
+                                        <h4 class="font-black text-stone-800 mb-1">${v.name}</h4>
+                                        <div class="flex justify-between items-end mt-4">
+                                            <div>
+                                                <p class="text-[10px] text-stone-400 font-bold uppercase">Total HPP</p>
+                                                <p class="font-bold text-amber-900">${formatIDR(m.totalHpp)}</p>
+                                            </div>
+                                            <div class="text-right">
+                                                <p class="text-[10px] text-stone-400 font-bold uppercase">Kapasitas</p>
+                                                <p class="text-xl font-black ${m.maxCanProduce < 10 ? 'text-red-600' : 'text-stone-800'}">${m.maxCanProduce} <span class="text-xs">btl</span></p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderTransaksi(el) {
+            el.innerHTML = `
+                <div class="grid md:grid-cols-12 gap-8 animate-fade-in">
+                    <div class="md:col-span-4 space-y-4">
+                        <div class="bg-white p-6 rounded-3xl border border-stone-100 shadow-sm">
+                            <h3 class="font-black mb-4 flex items-center gap-2 text-stone-800"><i data-lucide="shopping-cart" class="text-amber-600 w-5 h-5"></i> Kasir Cepat</h3>
+                            <div class="space-y-2">
+                                ${state.variants.map(v => {
+                                    const m = calculateVariantMetrics(v);
+                                    return `
+                                        <button onclick="addSale(${v.id})" ${m.maxCanProduce <= 0 ? 'disabled' : ''} class="w-full flex justify-between items-center p-4 rounded-2xl border transition-all ${m.maxCanProduce <= 0 ? 'bg-stone-50 opacity-40 cursor-not-allowed' : 'hover:border-amber-500 hover:bg-amber-50 border-stone-50'}">
+                                            <div class="text-left"><p class="font-black text-stone-800">${v.name}</p><p class="text-[10px] font-bold text-stone-400 uppercase">Stok: ${m.maxCanProduce}</p></div>
+                                            <i data-lucide="plus" class="w-4 h-4"></i>
+                                        </button>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="md:col-span-8">
+                        <div class="bg-white rounded-[32px] border border-stone-100 shadow-sm overflow-hidden">
+                            <div class="p-6 border-b border-stone-50 flex justify-between items-center"><h3 class="font-black">Riwayat Penjualan</h3><button onclick="state.sales=[]; render();" class="text-xs text-red-400 font-bold italic">Reset</button></div>
+                            <div class="max-h-[500px] overflow-y-auto">
+                                <table class="w-full text-left text-sm">
+                                    <thead class="bg-stone-50 text-[10px] font-black uppercase text-stone-400 tracking-widest">
+                                        <tr><th class="px-8 py-4">Waktu</th><th class="px-8 py-4">Produk</th><th class="px-8 py-4 text-right">Harga</th></tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-stone-50">
+                                        ${state.sales.length === 0 ? '<tr><td colspan="3" class="px-8 py-20 text-center text-stone-300 italic">Belum ada data</td></tr>' : 
+                                          state.sales.map(s => `
+                                            <tr class="hover:bg-stone-50/50">
+                                                <td class="px-8 py-4 text-stone-400 text-xs">${s.date}</td>
+                                                <td class="px-8 py-4 font-black">${s.name}</td>
+                                                <td class="px-8 py-4 text-right font-black text-amber-700">${formatIDR(s.price)}</td>
+                                            </tr>
+                                          `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderLaporan(el) {
+            const now = new Date();
+            const reportData = state.sales.filter(sale => {
+                const saleDate = new Date(sale.timestamp);
+                if (state.reportFilter === 'daily') return saleDate.toDateString() === now.toDateString();
+                if (state.reportFilter === 'weekly') return (now - saleDate) / (1000 * 60 * 60 * 24) <= 7;
+                if (state.reportFilter === 'monthly') return saleDate.getMonth() === now.getMonth() && saleDate.getFullYear() === now.getFullYear();
+                return true;
+            });
+
+            const monthlyOverhead = calculateTotalMonthlyOverhead();
+            const monthlyDepreciation = calculateMonthlyAssetDepreciation();
+            
+            let divisor = 1;
+            if (state.reportFilter === 'daily') divisor = 30;
+            if (state.reportFilter === 'weekly') divisor = 4.28;
+
+            const allocatedOverhead = monthlyOverhead / divisor;
+            const allocatedDepreciation = monthlyDepreciation / divisor;
+
+            const revenue = reportData.reduce((a, b) => a + b.price, 0);
+            const ingredientCosts = reportData.reduce((a, b) => a + b.recordedIngredientCost, 0);
+            const netProfit = revenue - ingredientCosts - allocatedOverhead - allocatedDepreciation;
+
+            // Target BEP berdasarkan filter periode
+            const bepMetrics = calculateBEPMetrics();
+            let bepTarget = bepMetrics.bepUnits;
+            if (state.reportFilter === 'daily') bepTarget = Math.ceil(bepMetrics.bepUnits / 30);
+            if (state.reportFilter === 'weekly') bepTarget = Math.ceil(bepMetrics.bepUnits / 4.28);
+            const isBepReached = reportData.length >= bepTarget;
+
+            el.innerHTML = `
+                <div class="space-y-6 animate-fade-in">
+                    <div class="bg-white p-6 rounded-3xl border border-stone-100 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
+                        <div class="flex items-center gap-3">
+                            <div class="bg-amber-100 p-3 rounded-2xl"><i data-lucide="bar-chart-3" class="text-amber-800 w-6 h-6"></i></div>
+                            <div><h3 class="text-xl font-black text-stone-800">Laporan Laba Rugi Akurat</h3><p class="text-xs text-stone-400">Termasuk beban overhead dan depresiasi aset</p></div>
+                        </div>
+                        <div class="flex bg-stone-100 p-1 rounded-xl">
+                            <button onclick="state.reportFilter='daily'; render();" class="px-4 py-2 rounded-lg text-xs font-bold ${state.reportFilter==='daily'?'bg-white text-amber-800 shadow-sm':'text-stone-400'}">Hari Ini</button>
+                            <button onclick="state.reportFilter='weekly'; render();" class="px-4 py-2 rounded-lg text-xs font-bold ${state.reportFilter==='weekly'?'bg-white text-amber-800 shadow-sm':'text-stone-400'}">7 Hari</button>
+                            <button onclick="state.reportFilter='monthly'; render();" class="px-4 py-2 rounded-lg text-xs font-bold ${state.reportFilter==='monthly'?'bg-white text-amber-800 shadow-sm':'text-stone-400'}">Bulan Ini</button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                        <div class="bg-white p-6 rounded-3xl border border-stone-100 shadow-sm">
+                            <p class="text-stone-400 text-[10px] font-black uppercase tracking-widest mb-1">Omzet</p>
+                            <h4 class="text-lg font-black">${formatIDR(revenue)}</h4>
+                        </div>
+                        <div class="bg-white p-6 rounded-3xl border border-stone-100 shadow-sm">
+                            <p class="text-stone-400 text-[10px] font-black uppercase tracking-widest mb-1">Bahan Baku</p>
+                            <h4 class="text-lg font-black text-stone-500">${formatIDR(ingredientCosts)}</h4>
+                        </div>
+                        <div class="bg-white p-6 rounded-3xl border border-stone-100 shadow-sm">
+                            <p class="text-stone-400 text-[10px] font-black uppercase tracking-widest mb-1">Overhead</p>
+                            <h4 class="text-lg font-black text-red-400">${formatIDR(allocatedOverhead)}</h4>
+                        </div>
+                        <div class="bg-white p-6 rounded-3xl border border-stone-100 shadow-sm">
+                            <p class="text-stone-400 text-[10px] font-black uppercase tracking-widest mb-1">Depresiasi</p>
+                            <h4 class="text-lg font-black text-amber-600">${formatIDR(allocatedDepreciation)}</h4>
+                        </div>
+                        <div class="p-6 rounded-3xl border shadow-sm ${netProfit >= 0 ? 'bg-green-50 border-green-100' : 'bg-red-50 border-red-100'}">
+                            <p class="${netProfit >= 0 ? 'text-green-600' : 'text-red-600'} text-[10px] font-black uppercase tracking-widest mb-1">Laba Bersih</p>
+                            <h4 class="text-xl font-black ${netProfit >= 0 ? 'text-green-700' : 'text-red-700'}">${netProfit < 0 ? '-' : ''}${formatIDR(Math.abs(netProfit))}</h4>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-3xl border border-stone-100 shadow-sm flex flex-col gap-3">
+                        <div class="flex justify-between items-end">
+                            <div>
+                                <p class="text-stone-400 text-[10px] font-black uppercase tracking-widest mb-1">Status Balik Modal (BEP) - ${state.reportFilter === 'daily' ? 'Harian' : state.reportFilter === 'weekly' ? 'Mingguan' : 'Bulanan'}</p>
+                                <h4 class="text-lg font-black ${isBepReached ? 'text-green-600' : 'text-indigo-600'}">${reportData.length} / ${bepTarget} Botol Terjual</h4>
+                            </div>
+                            <span class="text-xs font-bold px-3 py-1 rounded-full ${isBepReached ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}">${isBepReached ? 'Balik Modal Tercapai \u2713' : 'Belum Balik Modal'}</span>
+                        </div>
+                        <div class="w-full bg-stone-100 rounded-full h-3 overflow-hidden">
+                            <div class="h-3 rounded-full transition-all duration-500 ${isBepReached ? 'bg-green-500' : 'bg-indigo-500'}" style="width: ${Math.min((reportData.length / (bepTarget || 1)) * 100, 100)}%"></div>
+                        </div>
+                        <p class="text-[10px] text-stone-400 mt-1">Dihitung berdasarkan rata-rata margin untuk menutupi seluruh biaya operasional & penyusutan aset periode ini.</p>
+                    </div>
+
+                    ${netProfit < 0 ? `
+                        <div class="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex items-center gap-3">
+                            <i data-lucide="alert-triangle" class="text-amber-600"></i>
+                            <p class="text-xs text-amber-800"><b>Rugi Terdeteksi:</b> Penjualan belum cukup untuk menutup biaya operasional harian Anda.</p>
+                        </div>
+                    ` : ''}
+
+                    <div class="bg-white rounded-[32px] border border-stone-100 shadow-sm overflow-hidden">
+                        <div class="p-6 border-b border-stone-50 font-black">Detail Transaksi</div>
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-stone-50 text-[10px] font-black uppercase text-stone-400 tracking-widest">
+                                <tr><th class="px-8 py-4">Waktu</th><th class="px-8 py-4">Varian</th><th class="px-8 py-4 text-right">Laba Kotor/Botol</th></tr>
+                            </thead>
+                            <tbody class="divide-y divide-stone-50">
+                                ${reportData.map(s => `
+                                    <tr>
+                                        <td class="px-8 py-4 text-stone-400 text-xs">${s.date}</td>
+                                        <td class="px-8 py-4 font-bold">${s.name}</td>
+                                        <td class="px-8 py-4 text-right font-black text-green-600">${formatIDR(s.price - s.recordedIngredientCost)}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderPengaturan(el) {
+            const currentVariant = state.variants.find(v => v.id === state.editingVariantId);
+            
+            el.innerHTML = `
+                <div class="space-y-8 animate-fade-in">
+                    <!-- 1. GUDANG -->
+                    <section class="bg-white p-8 rounded-[32px] border border-stone-100 shadow-sm">
+                        <div class="flex justify-between items-center mb-6">
+                            <div><h3 class="text-xl font-black flex items-center gap-2"><i data-lucide="database" class="text-amber-600"></i> 1. Gudang Bahan Baku</h3><p class="text-xs text-stone-400">Harga bahan dasar yang Anda beli beserta jumlah stoknya</p></div>
+                            <button onclick="addIngredient()" class="bg-stone-900 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-stone-800">+ Tambah</button>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            ${state.ingredients.map(ing => `
+                                <div class="p-4 bg-stone-50 rounded-2xl border border-stone-100 flex flex-col gap-3">
+                                    <div class="flex justify-between items-center">
+                                        <input class="bg-transparent font-black text-sm w-full outline-none text-stone-800" value="${ing.name}" onchange="updateIng(${ing.id}, 'name', this.value)" placeholder="Nama Bahan Baku">
+                                        <button onclick="delIng(${ing.id})" class="text-red-300 hover:text-red-500 ml-2"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-3">
+                                        <div class="flex flex-col gap-1">
+                                            <label class="text-[9px] font-black text-stone-400 uppercase tracking-widest">Harga Beli Total</label>
+                                            <div class="flex items-center gap-1 bg-white px-2 py-1.5 rounded-lg border border-stone-200">
+                                                <span class="text-[10px] text-stone-400 font-bold">Rp</span>
+                                                <input class="w-full text-xs font-bold outline-none" type="number" value="${ing.cost}" onchange="updateIng(${ing.id}, 'cost', parseFloat(this.value))">
+                                            </div>
+                                        </div>
+                                        <div class="flex flex-col gap-1">
+                                            <label class="text-[9px] font-black text-stone-400 uppercase tracking-widest">Jumlah & Satuan</label>
+                                            <div class="flex items-center gap-1 bg-white px-2 py-1.5 rounded-lg border border-stone-200">
+                                                <input class="w-full text-xs font-bold outline-none text-right" type="number" value="${ing.bulkAmount}" onchange="updateIng(${ing.id}, 'bulkAmount', parseFloat(this.value))">
+                                                <select class="text-[10px] bg-transparent font-bold outline-none border-l pl-1 text-amber-700" onchange="updateIng(${ing.id}, 'unit', this.value)">
+                                                    <option value="g" ${ing.unit === 'g' ? 'selected' : ''}>g</option>
+                                                    <option value="ml" ${ing.unit === 'ml' ? 'selected' : ''}>ml</option>
+                                                    <option value="pcs" ${ing.unit === 'pcs' ? 'selected' : ''}>pcs</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="pt-2 border-t border-stone-200 flex justify-between items-center">
+                                        <span class="text-[10px] text-stone-400 font-medium">Harga per satuan:</span>
+                                        <span class="text-[10px] font-black text-amber-700">Rp ${Math.round(ing.cost / (ing.bulkAmount || 1)).toLocaleString('id-ID')} / ${ing.unit}</span>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </section>
+
+                    <!-- 2. ASET TETAP (NEW) -->
+                    <section class="bg-white p-8 rounded-[32px] border border-stone-100 shadow-sm">
+                        <div class="flex justify-between items-center mb-6">
+                            <div><h3 class="text-xl font-black flex items-center gap-2"><i data-lucide="package" class="text-amber-600"></i> 2. Aset Tetap & Peralatan</h3><p class="text-xs text-stone-400">Peralatan jangka panjang (Biaya penyusutan dihitung otomatis)</p></div>
+                            <button onclick="addAsset()" class="bg-stone-900 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-stone-800">+ Tambah Aset</button>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            ${state.assets.map(asset => `
+                                <div class="p-4 bg-stone-50 rounded-2xl border border-stone-100 space-y-3">
+                                    <div class="flex justify-between">
+                                        <input class="bg-transparent font-bold text-sm" value="${asset.name}" onchange="updateAsset(${asset.id}, 'name', this.value)">
+                                        <button onclick="delAsset(${asset.id})" class="text-red-300"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <label class="text-[8px] font-black text-stone-400">HARGA BELI</label>
+                                            <input class="w-full bg-white p-1 rounded border text-xs font-bold" type="number" value="${asset.cost}" onchange="updateAsset(${asset.id}, 'cost', parseFloat(this.value))">
+                                        </div>
+                                        <div>
+                                            <label class="text-[8px] font-black text-stone-400">MASA PAKAI (THN)</label>
+                                            <input class="w-full bg-white p-1 rounded border text-xs font-bold" type="number" value="${asset.lifeYears}" onchange="updateAsset(${asset.id}, 'lifeYears', parseFloat(this.value))">
+                                        </div>
+                                    </div>
+                                    <div class="pt-2 border-t flex justify-between">
+                                        <span class="text-[10px] text-stone-400">Penyusutan/Bulan:</span>
+                                        <span class="text-[10px] font-bold text-amber-700">${formatIDR(asset.cost / (asset.lifeYears * 12))}</span>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </section>
+
+                    <!-- 3. TARGET & OVERHEAD -->
+                    <section class="bg-white p-8 rounded-[32px] border border-stone-100 shadow-sm">
+                        <div class="flex justify-between items-center mb-6">
+                            <div><h3 class="text-xl font-black flex items-center gap-2 text-stone-800"><i data-lucide="target" class="text-amber-600"></i> 3. Target & Biaya Overhead</h3><p class="text-xs text-stone-400">Biaya operasional tetap bulanan</p></div>
+                        </div>
+                        <div class="grid md:grid-cols-3 gap-6">
+                            <div class="bg-amber-50 p-6 rounded-2xl border border-amber-100">
+                                <label class="text-[10px] font-black text-amber-800 uppercase tracking-widest block mb-2">Target Produksi (btl/bln)</label>
+                                <input type="number" class="w-full bg-white p-3 rounded-xl border border-amber-200 text-2xl font-black text-amber-900 outline-none" value="${state.targetQty}" onchange="updateTargetQty(this.value)">
+                            </div>
+                            <div class="md:col-span-2 space-y-3">
+                                <label class="text-[10px] font-black text-stone-400 uppercase tracking-widest block mb-1">Rincian Overhead (Sewa, Gaji, dsb)</label>
+                                ${state.opsCosts.map(ops => `
+                                    <div class="flex gap-2">
+                                        <input class="flex-1 p-3 bg-stone-50 border rounded-xl text-xs font-bold outline-none" value="${ops.name}" onchange="updateOpsCost(${ops.id}, 'name', this.value)">
+                                        <div class="relative w-32">
+                                            <span class="absolute left-3 top-3 text-[10px] text-stone-400">Rp</span>
+                                            <input type="number" class="w-full pl-8 pr-3 py-3 bg-stone-50 border rounded-xl text-xs font-black outline-none" value="${ops.monthly}" onchange="updateOpsCost(${ops.id}, 'monthly', parseFloat(this.value))">
+                                        </div>
+                                        <button onclick="delOps(${ops.id})" class="p-2 text-red-300"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                    </div>
+                                `).join('')}
+                                <button onclick="addOps()" class="text-xs font-bold text-amber-700 flex items-center gap-1 mt-2">+ Tambah Overhead</button>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- 4. RESEP -->
+                    <div class="grid md:grid-cols-12 gap-8">
+                        <div class="md:col-span-4">
+                            <div class="bg-white p-6 rounded-3xl border border-stone-100 shadow-sm">
+                                <h3 class="font-black mb-4 flex items-center gap-2"><i data-lucide="layers" class="text-amber-600 w-5 h-5"></i> 4. Varian Produk</h3>
+                                <div class="space-y-2">
+                                    ${state.variants.map(v => `
+                                        <button onclick="state.editingVariantId=${v.id}; render();" class="w-full flex justify-between items-center p-4 rounded-2xl border ${state.editingVariantId===v.id?'border-amber-600 bg-amber-50':'border-stone-50'}">
+                                            <span class="font-bold text-sm">${v.name}</span>
+                                            <i data-lucide="chevron-right" class="w-4 h-4 ${state.editingVariantId===v.id?'text-amber-600':'text-stone-300'}"></i>
+                                        </button>
+                                    `).join('')}
+                                    <button onclick="addVariant()" class="w-full p-4 border border-dashed rounded-2xl text-stone-400 text-xs font-bold hover:bg-stone-50">+ Varian Baru</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="md:col-span-8">
+                            ${currentVariant ? `
+                                <div class="bg-white p-8 rounded-[32px] border border-stone-100 shadow-sm space-y-6">
+                                    <h3 class="text-xl font-black">Edit Komposisi: ${currentVariant.name}</h3>
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div class="bg-stone-50 p-3 rounded-xl"><label class="text-[10px] font-black text-stone-400 uppercase">Nama</label><input class="w-full bg-transparent font-bold outline-none" value="${currentVariant.name}" onchange="updateVar(${currentVariant.id}, 'name', this.value)"></div>
+                                        <div class="bg-stone-50 p-3 rounded-xl"><label class="text-[10px] font-black text-stone-400 uppercase">Harga</label><input class="w-full bg-transparent font-bold text-amber-700 outline-none" type="number" value="${currentVariant.price}" onchange="updateVar(${currentVariant.id}, 'price', parseInt(this.value))"></div>
+                                    </div>
+                                    <div class="space-y-3">
+                                        <p class="text-[10px] font-black text-stone-400 uppercase tracking-widest">Resep per Botol</p>
+                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            ${state.ingredients.map(ing => {
+                                                const recipe = currentVariant.recipe.find(r => r.ingId === ing.id);
+                                                return `
+                                                    <div class="flex items-center justify-between p-3 bg-stone-50 rounded-2xl border border-stone-100">
+                                                        <span class="text-xs font-bold text-stone-600">${ing.name}</span>
+                                                        <div class="flex items-center gap-2">
+                                                            <input class="w-16 p-2 border rounded-lg text-center font-black text-amber-900 text-xs" type="number" value="${recipe ? recipe.qty : ''}" placeholder="0" onchange="updateRecipe(${currentVariant.id}, ${ing.id}, this.value)">
+                                                            <span class="text-[9px] font-bold text-stone-400 uppercase w-4">${ing.unit}</span>
+                                                        </div>
+                                                    </div>
+                                                `;
+                                            }).join('')}
+                                        </div>
+                                    </div>
+                                    <div class="bg-amber-800 p-4 rounded-2xl flex justify-between items-center text-white">
+                                        <span class="text-sm font-bold flex items-center gap-2"><i data-lucide="calculator" class="w-4 h-4 text-amber-300"></i> HPP Total per Unit</span>
+                                        <span class="text-xl font-black italic">${formatIDR(calculateVariantMetrics(currentVariant).totalHpp)}</span>
+                                    </div>
+                                </div>
+                            ` : `<div class="h-full min-h-[400px] border-2 border-dashed border-stone-200 rounded-[32px] flex items-center justify-center text-stone-300 font-bold bg-white">Pilih Varian untuk mengatur racikan resep</div>`}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- CRUD HELPERS ---
+        window.addIngredient = async () => {
+            const newItem = { id: Date.now(), name: 'Bahan Baru', cost: 0, bulkAmount: 1000, unit: 'g' };
+            await supabaseClient.from('ingredients').insert([newItem]);
+            state.ingredients.push(newItem);
+            render();
+        };
+        window.updateIng = async (id, f, v) => {
+            await supabaseClient.from('ingredients').update({ [f]: v }).eq('id', id);
+            const i = state.ingredients.find(x => x.id === id);
+            if (i) i[f] = v;
+            render();
+        };
+        window.delIng = async (id) => {
+            await supabaseClient.from('ingredients').delete().eq('id', id);
+            state.ingredients = state.ingredients.filter(x => x.id !== id);
+            render();
+        };
+        
+        window.addAsset = async () => {
+            const newItem = { id: Date.now(), name: 'Aset Baru', cost: 0, lifeYears: 5 };
+            await supabaseClient.from('assets').insert([newItem]);
+            state.assets.push(newItem);
+            render();
+        };
+        window.updateAsset = async (id, f, v) => {
+            await supabaseClient.from('assets').update({ [f]: v }).eq('id', id);
+            const a = state.assets.find(x => x.id === id);
+            if (a) a[f] = v;
+            render();
+        };
+        window.delAsset = async (id) => {
+            await supabaseClient.from('assets').delete().eq('id', id);
+            state.assets = state.assets.filter(x => x.id !== id);
+            render();
+        };
+
+        window.addVariant = async () => {
+            const nid = Date.now();
+            const newItem = { id: nid, name: 'Varian Baru', price: 0, recipe: [] };
+            await supabaseClient.from('variants').insert([newItem]);
+            state.variants.push(newItem);
+            state.editingVariantId = nid;
+            render();
+        };
+        window.updateVar = async (id, f, v) => {
+            await supabaseClient.from('variants').update({ [f]: v }).eq('id', id);
+            const x = state.variants.find(y => y.id === id);
+            if (x) x[f] = v;
+            render();
+        };
+        window.updateRecipe = async (vid, iid, qty) => {
+            const v = state.variants.find(x => x.id === vid);
+            if (v) {
+                const other = v.recipe.filter(r => r.ingId !== iid);
+                const q = parseFloat(qty);
+                const newRecipe = q > 0 ? [...other, { ingId: iid, qty: q }] : other;
+                await supabaseClient.from('variants').update({ recipe: newRecipe }).eq('id', vid);
+                v.recipe = newRecipe;
+            }
+            render();
+        };
+        window.updateTargetQty = async (val) => {
+            const newQty = parseInt(val) || 1;
+            await supabaseClient.from('settings').update({ targetQty: newQty }).eq('id', 1);
+            state.targetQty = newQty;
+            render();
+        };
+        window.addOps = async () => {
+            const newItem = { id: Date.now(), name: 'Biaya Baru', monthly: 0 };
+            await supabaseClient.from('ops_costs').insert([newItem]);
+            state.opsCosts.push(newItem);
+            render();
+        };
+        window.updateOpsCost = async (id, f, v) => {
+            await supabaseClient.from('ops_costs').update({ [f]: v }).eq('id', id);
+            const o = state.opsCosts.find(x => x.id === id);
+            if (o) o[f] = v;
+            render();
+        };
+        window.delOps = async (id) => {
+            await supabaseClient.from('ops_costs').delete().eq('id', id);
+            state.opsCosts = state.opsCosts.filter(x => x.id !== id);
+            render();
+        };
+
+        // --- AUTH LOGIC ---
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const em = document.getElementById('email').value;
+            const pw = document.getElementById('password').value;
+            if (em === 'admin@kopi.com' && pw === 'admin123') {
+                const btn = e.target.querySelector('button');
+                const origHtml = btn.innerHTML;
+                btn.innerHTML = 'Memuat Data Cloud...';
+                
+                // Fetch dari cloud supabase ketika berhasil login
+                await loadDataFromSupabase();
+                
+                state.isLoggedIn = true;
+                document.getElementById('login-screen').classList.add('hidden');
+                document.getElementById('app-screen').classList.remove('hidden');
+                render();
+                
+                btn.innerHTML = origHtml;
+            } else {
+                document.getElementById('login-error').classList.remove('hidden');
+            }
+        });
+
+        lucide.createIcons();
+    </script>
+</body>
+</html>
