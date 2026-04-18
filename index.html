@@ -16,9 +16,17 @@
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         .animate-fade-in { animation: fadeIn 0.3s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* PENGATURAN MODE CETAK (PRINT) */
+        @media print {
+            body * { visibility: hidden; }
+            #print-area, #print-area * { visibility: visible; }
+            #print-area { position: absolute; left: 0; top: 0; width: 100%; background: white;}
+            .no-print { display: none !important; }
+        }
     </style>
 </head>
-<body class="bg-[#fcfaf7] text-stone-800">
+<body class="bg-[#fcfaf7] text-stone-800 relative">
 
     <!-- LOGIN OVERLAY -->
     <div id="login-screen" class="min-h-screen flex items-center justify-center p-4">
@@ -48,7 +56,7 @@
     </div>
 
     <!-- MAIN APP -->
-    <div id="app-screen" class="hidden">
+    <div id="app-screen" class="hidden no-print">
         <header class="max-w-6xl mx-auto p-4 md:p-8 flex flex-col md:flex-row justify-between items-center gap-4">
             <div>
                 <h1 class="text-2xl font-black flex items-center gap-2 tracking-tight">
@@ -62,6 +70,9 @@
                 </button>
                 <button onclick="switchTab('pengaturan')" class="nav-btn px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all" id="btn-pengaturan">
                     <i data-lucide="settings" class="w-4 h-4"></i> Resep & Aset
+                </button>
+                <button onclick="switchTab('reseller')" class="nav-btn px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all" id="btn-reseller">
+                    <i data-lucide="users" class="w-4 h-4"></i> Reseller
                 </button>
                 <button onclick="switchTab('transaksi')" class="nav-btn px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all" id="btn-transaksi">
                     <i data-lucide="shopping-cart" class="w-4 h-4"></i> Jual
@@ -78,8 +89,11 @@
         </main>
     </div>
 
+    <!-- AREA KHUSUS UNTUK CETAK/PRINT -->
+    <div id="print-area"></div>
+
     <!-- MODAL CONTAINER (Pop-up Buatan) -->
-    <div id="modal-container"></div>
+    <div id="modal-container" class="no-print"></div>
 
     <script>
         // --- KONFIGURASI SUPABASE ---
@@ -94,13 +108,15 @@
             activeTab: 'dashboard',
             reportFilter: 'daily',
             editingVariantId: null,
+            selectedSalesChannel: 'direct', 
+            selectedReportReseller: 'all', 
             ingredients: [],
             assets: [],
             opsCosts: [],
+            resellers: [], 
             targetQty: 500,
             variants: [],
             sales: [],
-            // State untuk Custom Modal (Menggantikan fungsi default alert/confirm)
             modal: { isOpen: false, type: 'alert', title: '', message: '', onConfirm: null }
         };
 
@@ -127,7 +143,6 @@
                 return;
             }
             
-            // Render Pop-Up
             container.innerHTML = `
                 <div class="fixed inset-0 bg-stone-900/40 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-fade-in">
                     <div class="bg-white rounded-[32px] p-8 w-full max-w-sm shadow-2xl border border-stone-100">
@@ -151,24 +166,39 @@
         // --- FETCH DATA DARI SUPABASE ---
         async function loadDataFromSupabase() {
             try {
-                const [ingRes, astRes, opsRes, varRes, saleRes, setRes] = await Promise.all([
+                const [ingRes, astRes, opsRes, varRes, saleRes, setRes, resellerRes] = await Promise.all([
                     supabaseClient.from('ingredients').select('*').order('id'),
                     supabaseClient.from('assets').select('*').order('id'),
                     supabaseClient.from('ops_costs').select('*').order('id'),
                     supabaseClient.from('variants').select('*').order('id'),
                     supabaseClient.from('sales').select('*').order('timestamp', { ascending: false }),
-                    supabaseClient.from('settings').select('*').eq('id', 1).single()
+                    supabaseClient.from('settings').select('*').eq('id', 1).single(),
+                    supabaseClient.from('resellers').select('*').order('id') 
                 ]);
 
                 if (ingRes.data) state.ingredients = ingRes.data;
                 if (astRes.data) state.assets = astRes.data;
                 if (opsRes.data) state.opsCosts = opsRes.data;
-                if (varRes.data) state.variants = varRes.data;
                 if (saleRes.data) state.sales = saleRes.data;
                 if (setRes.data) state.targetQty = setRes.data.targetQty;
+                if (resellerRes.data) state.resellers = resellerRes.data;
+
+                // Trik: Membaca bottleSize dari JSON Recipe agar tidak error Schema
+                if (varRes.data) {
+                    state.variants = varRes.data.map(v => {
+                        let bSize = '250 ml';
+                        let cleanRecipe = [];
+                        if (Array.isArray(v.recipe)) {
+                            const sizeObj = v.recipe.find(r => r.ingId === 'SIZE');
+                            if (sizeObj) bSize = sizeObj.qty;
+                            cleanRecipe = v.recipe.filter(r => r.ingId !== 'SIZE');
+                        }
+                        return { ...v, bottleSize: bSize, recipe: cleanRecipe };
+                    });
+                }
             } catch (error) {
                 console.error("Gagal mengambil data dari Supabase:", error);
-                showModal('alert', 'Gagal Terhubung', 'Gagal mengambil data. Periksa koneksi internet Anda.');
+                showModal('alert', 'Gagal Terhubung', 'Gagal mengambil sebagian data dari database. Periksa konfigurasi Anda.');
             }
         }
 
@@ -188,32 +218,241 @@
             document.getElementById('app-screen').classList.add('hidden');
         }
 
+        // --- UTILITY GROUPING ---
+        // Menggabungkan baris transaksi harian agar terlihat seperti qty meskipun di DB tersimpan satuan
+        function getGroupedSales(salesArray) {
+            let map = {};
+            salesArray.forEach(s => {
+                const key = `${s.date}_${s.name}_${s.resellerId}`;
+                if(!map[key]) {
+                    map[key] = { ...s, qty: 0, totalOmzet: 0, totalProfitReseller: 0, totalIngCost: 0 };
+                }
+                map[key].qty += 1;
+                map[key].totalOmzet += s.price;
+                map[key].totalProfitReseller += (s.resellerProfit || 0);
+                map[key].totalIngCost += s.recordedIngredientCost;
+            });
+            return Object.values(map).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        }
+
         // --- DATA HANDLERS ---
+        function getSalesChannelInfo(variantPrice) {
+            let resellerId = null;
+            let resellerName = 'Langsung (Kasir)';
+            let resellerProfit = 0;
+
+            if (state.selectedSalesChannel !== 'direct') {
+                const r = state.resellers.find(x => x.id === parseInt(state.selectedSalesChannel));
+                if (r) {
+                    resellerId = r.id;
+                    resellerName = `Reseller: ${r.name}`;
+                    resellerProfit = variantPrice * ((r.discountRate || 0) / 100);
+                }
+            }
+            return { resellerId, resellerName, resellerProfit };
+        }
+
         function addSale(variantId) {
             const v = state.variants.find(x => x.id === variantId);
             const variantHPPInfo = calculateVariantMetrics(v);
+            const channelInfo = getSalesChannelInfo(v.price);
             
+            // Trik: Menyimpan bottleSize di dalam name agar tidak butuh modifikasi SQL Column
+            const fullName = `${v.name}|${v.bottleSize || '250 ml'}`;
+
             const newSale = {
                 id: Date.now(),
-                name: v.name,
-                price: v.price,
+                name: fullName,
+                price: v.price, 
                 recordedIngredientCost: variantHPPInfo.ingredientCostOnly,
+                resellerId: channelInfo.resellerId,
+                resellerName: channelInfo.resellerName,
+                resellerProfit: channelInfo.resellerProfit, 
                 timestamp: new Date().toISOString(),
-                date: new Date().toLocaleTimeString('id-ID')
+                date: new Date().toLocaleDateString('id-ID', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })
             };
             
-            // Simpan transaksi secara Optimistic (Background)
             supabaseClient.from('sales').insert([newSale]).then();
-            
             state.sales.unshift(newSale);
             render();
         }
 
+        window.submitBulkSales = async () => {
+            const dateInput = document.getElementById('bulk-date').value;
+            if (!dateInput) return showModal('alert', 'Perhatian', 'Pilih tanggal terlebih dahulu.');
+
+            const [year, month, day] = dateInput.split('-');
+            const selectedDate = new Date(year, month - 1, day, 12, 0, 0); 
+            const dateString = selectedDate.toLocaleDateString('id-ID', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+
+            let allNewSales = [];
+            let totalQty = 0;
+
+            state.variants.forEach(v => {
+                const qtyInput = document.getElementById(`bulk-qty-${v.id}`).value;
+                const qty = parseInt(qtyInput) || 0;
+                
+                if (qty > 0) {
+                    const variantHPPInfo = calculateVariantMetrics(v);
+                    const channelInfo = getSalesChannelInfo(v.price);
+                    totalQty += qty;
+                    const fullName = `${v.name}|${v.bottleSize || '250 ml'}`;
+                    
+                    // Membuat entri array satu per satu agar database tidak error kehilangan kolom qty
+                    for(let i=0; i < qty; i++) {
+                        allNewSales.push({
+                            id: Date.now() + Math.floor(Math.random() * 1000000) + i,
+                            name: fullName,
+                            price: v.price,
+                            recordedIngredientCost: variantHPPInfo.ingredientCostOnly,
+                            resellerId: channelInfo.resellerId,
+                            resellerName: channelInfo.resellerName,
+                            resellerProfit: channelInfo.resellerProfit,
+                            timestamp: selectedDate.toISOString(),
+                            date: dateString
+                        });
+                    }
+                }
+            });
+
+            if (allNewSales.length === 0) {
+                return showModal('alert', 'Perhatian', 'Masukkan minimal 1 jumlah produk pada form sebelum menyimpan.');
+            }
+
+            showModal('alert', 'Memproses Data...', `Sedang menyimpan rekap sebanyak ${totalQty} botol ke dalam sistem.`);
+
+            try {
+                const { error } = await supabaseClient.from('sales').insert(allNewSales);
+                if (error) throw error;
+
+                state.sales = [...allNewSales, ...state.sales];
+                state.sales.sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+                render(); 
+
+                setTimeout(() => {
+                    showModal('alert', 'Rekap Tersimpan!', `Berhasil mencatat rekap penjualan sejumlah ${totalQty} produk untuk ${dateString}.`);
+                }, 100);
+
+            } catch (error) {
+                console.error("Gagal simpan rekap:", error);
+                showModal('alert', 'Gagal', 'Terjadi kesalahan saat mengunggah rekap data.');
+            }
+        };
+
+        window.printResellerReport = () => {
+            if(state.selectedReportReseller === 'all') {
+                return showModal('alert', 'Perhatian', 'Pilih nama spesifik Reseller terlebih dahulu untuk dicetak.');
+            }
+            const r = state.resellers.find(x => x.id === parseInt(state.selectedReportReseller));
+            if(!r) return;
+
+            const rSales = state.sales.filter(s => s.resellerId === r.id);
+            
+            let summary = {};
+            rSales.forEach(s => {
+                const nameParts = s.name.split('|');
+                const displayName = nameParts[0];
+                const displaySize = nameParts[1] || '250 ml';
+                const key = `${displayName} (${displaySize})`;
+                
+                if(!summary[key]) {
+                    summary[key] = { qty: 0, price: s.price, rProfit: s.resellerProfit || 0 };
+                }
+                summary[key].qty += 1;
+            });
+
+            let totalQty = 0;
+            let totalTagihan = 0;
+            let totalProfit = 0;
+
+            let tableHtml = Object.keys(summary).map(k => {
+                const item = summary[k];
+                totalQty += item.qty;
+                const itemTotalTagihan = (item.price - item.rProfit) * item.qty; 
+                const itemTotalProfit = item.rProfit * item.qty;
+                totalTagihan += itemTotalTagihan;
+                totalProfit += itemTotalProfit;
+
+                return `
+                <tr>
+                    <td style="padding:12px 8px; border-bottom:1px solid #e5e7eb;">${k}</td>
+                    <td style="padding:12px 8px; border-bottom:1px solid #e5e7eb; text-align:center; font-weight:bold;">${item.qty}</td>
+                    <td style="padding:12px 8px; border-bottom:1px solid #e5e7eb; text-align:right;">${formatIDR(item.price)}</td>
+                    <td style="padding:12px 8px; border-bottom:1px solid #e5e7eb; text-align:right;">${formatIDR(item.price - item.rProfit)}</td>
+                    <td style="padding:12px 8px; border-bottom:1px solid #e5e7eb; text-align:right; font-weight:bold;">${formatIDR(itemTotalTagihan)}</td>
+                    <td style="padding:12px 8px; border-bottom:1px solid #e5e7eb; text-align:right; color:#15803d; font-weight:bold;">${formatIDR(itemTotalProfit)}</td>
+                </tr>`;
+            }).join('');
+
+            const html = `
+                <div style="font-family: 'Plus Jakarta Sans', sans-serif; max-width: 800px; margin: 0 auto; padding: 40px 20px; color: #1c1917;">
+                    <div style="text-align: center; margin-bottom: 30px;">
+                        <h1 style="margin: 0; font-size: 24px; font-weight: 900; color:#92400e;">INVOICE & LAPORAN RESELLER</h1>
+                        <p style="margin: 4px 0 0; color: #78716c; font-size: 14px;">Sistem KopiManager Pro</p>
+                    </div>
+                    
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 30px; background: #fafaf9; padding: 20px; border-radius: 16px; border: 1px solid #f5f5f4;">
+                        <div>
+                            <p style="margin:0; font-size: 10px; color:#a8a29e; text-transform:uppercase; letter-spacing:1px; font-weight:bold;">Mitra Reseller</p>
+                            <h3 style="margin:4px 0; font-size: 18px; font-weight: 900;">${r.name}</h3>
+                            <p style="margin:0; color: #57534e; font-size: 14px;">WA: ${r.phone || '-'}</p>
+                        </div>
+                        <div style="text-align: right;">
+                            <p style="margin:0; font-size: 10px; color:#a8a29e; text-transform:uppercase; letter-spacing:1px; font-weight:bold;">Tanggal Cetak</p>
+                            <h3 style="margin:4px 0; font-size: 16px; font-weight: 700;">${new Date().toLocaleDateString('id-ID', {day:'2-digit', month:'long', year:'numeric'})}</h3>
+                            <p style="margin:0; font-size: 14px; color:#b45309; font-weight:bold;">Diskon: ${r.discountRate}%</p>
+                        </div>
+                    </div>
+
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 14px;">
+                        <thead>
+                            <tr style="background-color: #f5f5f4; text-transform: uppercase; font-size: 10px; letter-spacing: 1px; color:#78716c;">
+                                <th style="padding:12px 8px; text-align:left; border-bottom:2px solid #e5e7eb;">Produk & Ukuran</th>
+                                <th style="padding:12px 8px; text-align:center; border-bottom:2px solid #e5e7eb;">Qty</th>
+                                <th style="padding:12px 8px; text-align:right; border-bottom:2px solid #e5e7eb;">Hrg. Normal</th>
+                                <th style="padding:12px 8px; text-align:right; border-bottom:2px solid #e5e7eb;">Hrg. Reseller</th>
+                                <th style="padding:12px 8px; text-align:right; border-bottom:2px solid #e5e7eb;">Sub Total (Tagihan)</th>
+                                <th style="padding:12px 8px; text-align:right; border-bottom:2px solid #e5e7eb;">Profit Reseller</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${tableHtml}
+                            ${rSales.length === 0 ? '<tr><td colspan="6" style="text-align:center; padding: 40px; color:#a8a29e; font-weight:bold;">Belum ada riwayat transaksi untuk dicetak.</td></tr>' : ''}
+                        </tbody>
+                    </table>
+
+                    <div style="display: flex; justify-content: flex-end; width: 100%;">
+                        <div style="width: 350px; padding: 20px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 16px;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px; color: #78716c;">
+                                <span>Total Botol Terjual:</span>
+                                <strong>${totalQty} Botol</strong>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 16px; font-size: 14px; color: #15803d;">
+                                <span>Total Profit Reseller:</span>
+                                <strong>+ ${formatIDR(totalProfit)}</strong>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; border-top: 2px dashed #fcd34d; padding-top: 16px; font-size: 18px; color:#92400e;">
+                                <span>TOTAL SETORAN:</span>
+                                <strong style="font-weight:900;">${formatIDR(totalTagihan)}</strong>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <p style="text-align:center; margin-top: 60px; font-size: 12px; color: #a8a29e; font-weight:500;">
+                        Terima kasih atas kerja sama Anda yang luar biasa!
+                    </p>
+                </div>
+            `;
+
+            document.getElementById('print-area').innerHTML = html;
+            window.print();
+            setTimeout(() => { document.getElementById('print-area').innerHTML = ''; }, 1000);
+        }
+
         // --- CALCULATIONS ---
         function calculateMonthlyAssetDepreciation() {
-            return state.assets.reduce((acc, curr) => {
-                return acc + (curr.cost / (curr.lifeYears * 12));
-            }, 0);
+            return state.assets.reduce((acc, curr) => acc + (curr.cost / (curr.lifeYears * 12)), 0);
         }
 
         function calculateTotalMonthlyOverhead() {
@@ -232,7 +471,6 @@
             const monthlyDepreciation = calculateMonthlyAssetDepreciation();
             const monthlyOverhead = calculateTotalMonthlyOverhead();
             const totalMonthlyFixedCosts = monthlyDepreciation + monthlyOverhead;
-            
             const fixedCostPerUnit = totalMonthlyFixedCosts / state.targetQty;
             
             let maxCanProduce = Infinity;
@@ -279,9 +517,7 @@
 
         // --- RENDER ENGINE ---
         function render() {
-            // FIX: Simpan ID elemen yang sedang aktif (fokus) agar tidak mereset kursor saat mengetik
             const activeElementId = document.activeElement ? document.activeElement.id : null;
-
             const content = document.getElementById('tab-content');
             
             document.querySelectorAll('.nav-btn').forEach(btn => {
@@ -296,24 +532,23 @@
 
             if (state.activeTab === 'dashboard') renderDashboard(content);
             if (state.activeTab === 'pengaturan') renderPengaturan(content);
+            if (state.activeTab === 'reseller') renderReseller(content); 
             if (state.activeTab === 'transaksi') renderTransaksi(content);
             if (state.activeTab === 'laporan') renderLaporan(content);
 
             lucide.createIcons();
 
-            // FIX: Kembalikan fokus ke elemen setelah layar digambar ulang
             if (activeElementId) {
                 const elToFocus = document.getElementById(activeElementId);
-                if (elToFocus) {
-                    elToFocus.focus();
-                }
+                if (elToFocus) { elToFocus.focus(); }
             }
         }
 
         function renderDashboard(el) {
             const monthlyOverhead = calculateTotalMonthlyOverhead();
             const monthlyDepreciation = calculateMonthlyAssetDepreciation();
-            const totalOmzet = state.sales.reduce((a, b) => a + b.price, 0);
+            
+            const totalOmzet = state.sales.reduce((a, b) => a + (b.price - (b.resellerProfit || 0)), 0);
             
             const bepMetrics = calculateBEPMetrics();
             const bepDisplay = bepMetrics.bepUnits === Infinity ? 'N/A' : bepMetrics.bepUnits;
@@ -322,7 +557,7 @@
                 <div class="space-y-6 animate-fade-in">
                     <div class="grid grid-cols-1 md:grid-cols-5 gap-6">
                         <div class="bg-white p-6 rounded-3xl border border-stone-100 shadow-sm">
-                            <p class="text-stone-400 text-[10px] font-black uppercase tracking-widest mb-1">Total Omzet</p>
+                            <p class="text-stone-400 text-[10px] font-black uppercase tracking-widest mb-1">Total Omzet Bersih</p>
                             <h3 class="text-2xl font-black">${formatIDR(totalOmzet)}</h3>
                         </div>
                         <div class="bg-white p-6 rounded-3xl border border-stone-100 shadow-sm">
@@ -350,14 +585,17 @@
                                 const m = calculateVariantMetrics(v);
                                 return `
                                     <div class="p-5 bg-stone-50 rounded-2xl border border-stone-100">
-                                        <h4 class="font-black text-stone-800 mb-1">${v.name}</h4>
+                                        <div class="flex justify-between items-start mb-1">
+                                            <h4 class="font-black text-stone-800">${v.name}</h4>
+                                            <span class="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-1 rounded-lg">${v.bottleSize || '250 ml'}</span>
+                                        </div>
                                         <div class="flex justify-between items-end mt-4">
                                             <div>
                                                 <p class="text-[10px] text-stone-400 font-bold uppercase">Total HPP</p>
                                                 <p class="font-bold text-amber-900">${formatIDR(m.totalHpp)}</p>
                                             </div>
                                             <div class="text-right">
-                                                <p class="text-[10px] text-stone-400 font-bold uppercase">Kapasitas</p>
+                                                <p class="text-[10px] text-stone-400 font-bold uppercase">Kapasitas Stok</p>
                                                 <p class="text-xl font-black ${m.maxCanProduce < 10 ? 'text-red-600' : 'text-stone-800'}">${m.maxCanProduce} <span class="text-xs">btl</span></p>
                                             </div>
                                         </div>
@@ -370,46 +608,230 @@
             `;
         }
 
-        function renderTransaksi(el) {
+        function renderReseller(el) {
             el.innerHTML = `
+                <div class="space-y-8 animate-fade-in">
+                    <!-- DAFTAR RESELLER -->
+                    <section class="bg-white p-8 rounded-[32px] border border-stone-100 shadow-sm">
+                        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                            <div>
+                                <h3 class="text-xl font-black flex items-center gap-2"><i data-lucide="users" class="text-amber-600"></i> Manajemen Reseller</h3>
+                                <p class="text-xs text-stone-400 mt-1">Daftarkan mitra reseller dan tentukan persentase diskon yang Anda berikan.</p>
+                            </div>
+                            <button onclick="addReseller()" class="bg-stone-900 text-white px-4 py-3 rounded-xl text-xs font-bold hover:bg-stone-800 flex items-center gap-2 transition-all shadow-md active:scale-95">
+                                <i data-lucide="plus" class="w-4 h-4"></i> Tambah Mitra
+                            </button>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            ${state.resellers.length === 0 ? 
+                                '<div class="col-span-full p-10 flex flex-col items-center justify-center border-2 border-dashed border-stone-200 rounded-[24px] text-stone-400 bg-stone-50/50"><i data-lucide="users" class="w-8 h-8 mb-3 opacity-50"></i><p class="font-bold text-sm">Belum ada reseller terdaftar.</p><p class="text-xs font-medium mt-1">Klik tombol Tambah Mitra untuk mulai merekrut reseller Anda.</p></div>' 
+                                : 
+                                state.resellers.map(r => `
+                                <div class="p-5 bg-white rounded-2xl border border-stone-200 shadow-sm relative hover:border-amber-400 transition-colors group">
+                                    <button onclick="delReseller(${r.id})" class="absolute top-4 right-4 text-stone-300 hover:text-red-500 transition-colors p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                    <div class="pr-8 mb-4">
+                                        <label class="text-[9px] font-black text-stone-400 uppercase tracking-widest">Nama Reseller / Toko</label>
+                                        <input id="res-name-${r.id}" class="bg-transparent font-black text-lg w-full outline-none text-stone-800 placeholder-stone-300" value="${r.name}" onchange="updateReseller(${r.id}, 'name', this.value)" placeholder="Ketik Nama Reseller...">
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-3">
+                                        <div class="bg-stone-50 p-2.5 rounded-xl border border-stone-100 focus-within:border-amber-300 focus-within:bg-white transition-colors">
+                                            <label class="text-[9px] font-black text-stone-400 uppercase tracking-widest block mb-1">No. WhatsApp</label>
+                                            <input id="res-phone-${r.id}" class="w-full bg-transparent text-xs font-bold outline-none text-stone-700" value="${r.phone || ''}" onchange="updateReseller(${r.id}, 'phone', this.value)" placeholder="08...">
+                                        </div>
+                                        <div class="bg-amber-50 p-2.5 rounded-xl border border-amber-100 focus-within:border-amber-400 focus-within:bg-white transition-colors">
+                                            <label class="text-[9px] font-black text-amber-600 uppercase tracking-widest block mb-1">Potongan Harga</label>
+                                            <div class="flex items-center gap-1">
+                                                <input id="res-disc-${r.id}" class="w-full bg-transparent text-sm font-black outline-none text-right text-amber-900" type="number" value="${r.discountRate}" onchange="updateReseller(${r.id}, 'discountRate', parseFloat(this.value))">
+                                                <span class="text-xs text-amber-700 font-black">%</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </section>
+
+                    <!-- KALKULATOR PROFIT RESELLER -->
+                    <section class="bg-white p-8 rounded-[32px] border border-stone-100 shadow-sm">
+                        <div class="mb-6">
+                            <h3 class="text-xl font-black flex items-center gap-2"><i data-lucide="calculator" class="text-amber-600"></i> Kalkulator Harga & Profit Reseller</h3>
+                            <p class="text-xs text-stone-400 mt-1">Simulasi ini memperlihatkan harga khusus reseller dan besaran laba yang akan mereka peroleh saat menjual dengan Harga Normal.</p>
+                        </div>
+                        <div class="overflow-x-auto bg-stone-50/50 rounded-2xl border border-stone-100 mb-8">
+                            <table class="w-full text-left text-sm whitespace-nowrap">
+                                <thead class="bg-stone-100 text-[10px] font-black uppercase text-stone-500 tracking-widest border-b border-stone-200">
+                                    <tr>
+                                        <th class="px-6 py-4 rounded-tl-xl">Varian Kopi & Ukuran</th>
+                                        <th class="px-6 py-4">Harga Normal</th>
+                                        ${state.resellers.map(r => `
+                                            <th class="px-6 py-4 border-l border-stone-200 bg-white/50">
+                                                <span class="text-amber-800 block text-xs">${r.name}</span>
+                                                <span class="text-[9px] text-stone-400">Diskon ${r.discountRate}%</span>
+                                            </th>
+                                        `).join('')}
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-stone-100">
+                                    ${state.variants.map(v => `
+                                        <tr class="hover:bg-white transition-colors">
+                                            <td class="px-6 py-4 font-bold text-stone-800">${v.name} <span class="text-[10px] bg-stone-100 text-stone-500 px-2 py-0.5 rounded-full ml-1">${v.bottleSize || '250 ml'}</span></td>
+                                            <td class="px-6 py-4 font-black text-stone-500">${formatIDR(v.price)}</td>
+                                            ${state.resellers.map(r => {
+                                                const resellerPrice = v.price - (v.price * ((r.discountRate || 0) / 100));
+                                                const resellerProfit = v.price - resellerPrice;
+                                                return `
+                                                    <td class="px-6 py-4 border-l border-stone-100">
+                                                        <div class="font-black text-amber-700 text-sm">${formatIDR(resellerPrice)}</div>
+                                                        <div class="text-[10px] text-green-600 font-bold flex items-center gap-1 mt-0.5"><i data-lucide="arrow-up-right" class="w-3 h-3"></i> Untung ${formatIDR(resellerProfit)}/btl</div>
+                                                    </td>
+                                                `;
+                                            }).join('')}
+                                        </tr>
+                                    `).join('')}
+                                    ${state.variants.length === 0 ? '<tr><td colspan="100%" class="px-6 py-12 text-center text-stone-400 font-bold bg-white">Tambahkan Varian Kopi di menu Pengaturan terlebih dahulu.</td></tr>' : ''}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- CETAK LAPORAN RESELLER -->
+                        <div class="bg-amber-50 p-6 rounded-[24px] border border-amber-100 flex flex-col md:flex-row gap-4 justify-between items-center">
+                            <div>
+                                <h4 class="font-black text-amber-900 mb-1 flex items-center gap-2"><i data-lucide="printer" class="w-4 h-4"></i> Laporan Tagihan Mitra</h4>
+                                <p class="text-xs text-amber-800/70">Pilih mitra untuk melihat dan mencetak rincian penjualan serta tagihan mereka.</p>
+                            </div>
+                            <div class="flex items-center gap-3 w-full md:w-auto">
+                                <select id="report-reseller-select" class="flex-1 md:w-64 bg-white p-3 rounded-xl border border-amber-200 font-bold text-sm outline-none text-stone-700" onchange="state.selectedReportReseller = this.value; render();">
+                                    <option value="all" ${state.selectedReportReseller === 'all' ? 'selected' : ''}>-- Pilih Nama Reseller --</option>
+                                    ${state.resellers.map(r => `<option value="${r.id}" ${state.selectedReportReseller == r.id ? 'selected' : ''}>${r.name}</option>`).join('')}
+                                </select>
+                                <button onclick="printResellerReport()" class="bg-amber-800 text-white px-6 py-3 rounded-xl font-bold shadow-md hover:bg-amber-900 transition-colors whitespace-nowrap">Cetak Invoice</button>
+                            </div>
+                        </div>
+
+                    </section>
+                </div>
+            `;
+        }
+
+        function renderTransaksi(el) {
+            const todayISOString = new Date().toISOString().split('T')[0];
+            const groupedSales = getGroupedSales(state.sales);
+
+            el.innerHTML = `
+                <!-- FILTER TIPE PENJUALAN (LANGSUNG ATAU RESELLER) -->
+                <div class="mb-6 bg-white p-4 rounded-2xl border border-stone-200 shadow-sm flex items-center gap-4 animate-fade-in">
+                    <div class="bg-stone-100 p-3 rounded-xl"><i data-lucide="store" class="text-stone-500 w-5 h-5"></i></div>
+                    <div class="flex-1">
+                        <label class="text-[9px] font-black text-stone-400 uppercase tracking-widest block mb-1">Pilih Tipe Penjualan / Kasir</label>
+                        <select id="sales-channel" class="w-full bg-transparent font-black text-lg outline-none text-stone-800 cursor-pointer" onchange="state.selectedSalesChannel = this.value; render();">
+                            <option value="direct" ${state.selectedSalesChannel === 'direct' ? 'selected' : ''}>Milik Sendiri (Langsung / Kasir)</option>
+                            ${state.resellers.map(r => `<option value="${r.id}" ${state.selectedSalesChannel == r.id ? 'selected' : ''}>Mitra Reseller: ${r.name}</option>`).join('')}
+                        </select>
+                    </div>
+                </div>
+
                 <div class="grid md:grid-cols-12 gap-8 animate-fade-in">
-                    <div class="md:col-span-4 space-y-4">
+                    <div class="md:col-span-4 space-y-6">
+                        
+                        <!-- KASIR CEPAT (SINGLE ENTRY) -->
                         <div class="bg-white p-6 rounded-3xl border border-stone-100 shadow-sm">
-                            <h3 class="font-black mb-4 flex items-center gap-2 text-stone-800"><i data-lucide="shopping-cart" class="text-amber-600 w-5 h-5"></i> Kasir Cepat</h3>
+                            <h3 class="font-black mb-4 flex items-center gap-2 text-stone-800"><i data-lucide="shopping-cart" class="text-amber-600 w-5 h-5"></i> Kasir Cepat (Satuan)</h3>
                             <div class="space-y-2">
                                 ${state.variants.map(v => {
                                     const m = calculateVariantMetrics(v);
                                     return `
                                         <button onclick="addSale(${v.id})" ${m.maxCanProduce <= 0 ? 'disabled' : ''} class="w-full flex justify-between items-center p-4 rounded-2xl border transition-all ${m.maxCanProduce <= 0 ? 'bg-stone-50 opacity-40 cursor-not-allowed' : 'hover:border-amber-500 hover:bg-amber-50 border-stone-50'}">
-                                            <div class="text-left"><p class="font-black text-stone-800">${v.name}</p><p class="text-[10px] font-bold text-stone-400 uppercase">Stok: ${m.maxCanProduce}</p></div>
+                                            <div class="text-left">
+                                                <p className="font-black text-stone-800">${v.name}</p>
+                                                <div class="flex items-center gap-2 mt-1">
+                                                    <span class="text-[9px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-md">${v.bottleSize || '250 ml'}</span>
+                                                    <span class="text-[9px] font-bold text-stone-400 uppercase">Stok: ${m.maxCanProduce}</span>
+                                                </div>
+                                            </div>
                                             <i data-lucide="plus" class="w-4 h-4"></i>
                                         </button>
                                     `;
                                 }).join('')}
                             </div>
                         </div>
+
+                        <!-- INPUT REKAP HARIAN (BULK ENTRY) -->
+                        <div class="bg-white p-6 rounded-3xl border border-stone-100 shadow-sm">
+                            <h3 class="font-black mb-1 flex items-center gap-2 text-stone-800"><i data-lucide="calendar-plus" class="text-amber-600 w-5 h-5"></i> Input Rekap Harian</h3>
+                            <p class="text-[10px] text-stone-400 font-bold mb-5 leading-relaxed">Masukkan total terjual hari ini. Pastikan tipe penjualan (Toko/Reseller) di atas sudah sesuai.</p>
+                            
+                            <div class="space-y-4">
+                                <div class="bg-stone-50 p-3 rounded-2xl border border-stone-100">
+                                    <label class="text-[9px] font-black text-stone-400 uppercase tracking-widest block mb-1">Pilih Tanggal Penjualan</label>
+                                    <input type="date" id="bulk-date" class="w-full bg-transparent text-sm font-bold outline-none text-stone-700" value="${todayISOString}">
+                                </div>
+                                
+                                <div class="space-y-2">
+                                    ${state.variants.map(v => `
+                                        <div class="flex justify-between items-center py-2 border-b border-stone-100 last:border-0">
+                                            <div class="flex flex-col pr-2 overflow-hidden">
+                                                <span class="font-bold text-xs text-stone-700 truncate">${v.name}</span>
+                                                <span class="text-[10px] text-stone-400 font-bold">${v.bottleSize || '250 ml'}</span>
+                                            </div>
+                                            <div class="flex items-center gap-2 bg-stone-50 px-2 py-1 rounded-lg border border-stone-200">
+                                                <input type="number" id="bulk-qty-${v.id}" class="w-12 bg-transparent text-center font-black text-amber-900 text-sm outline-none" placeholder="0" min="0">
+                                                <span class="text-[9px] text-stone-400 font-bold uppercase">Btl</span>
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                                
+                                <button onclick="submitBulkSales()" class="w-full bg-stone-900 text-white font-bold py-3.5 rounded-xl hover:bg-stone-800 transition-colors shadow-md mt-2 flex justify-center items-center gap-2">
+                                    <i data-lucide="save" class="w-4 h-4 text-stone-300"></i> Simpan Rekap
+                                </button>
+                            </div>
+                        </div>
+
                     </div>
+                    
                     <div class="md:col-span-8">
-                        <div class="bg-white rounded-[32px] border border-stone-100 shadow-sm overflow-hidden">
+                        <div class="bg-white rounded-[32px] border border-stone-100 shadow-sm overflow-hidden h-full">
                             <div class="p-6 border-b border-stone-50 flex justify-between items-center">
-                                <h3 class="font-black">Riwayat Penjualan</h3>
-                                <!-- PANGGILAN FUNGSI RESET MELALUI MODAL BARU -->
+                                <h3 class="font-black text-lg">Detail Riwayat Penjualan</h3>
                                 <button onclick="promptReset('sales')" class="text-xs text-red-500 font-bold italic hover:underline">Reset Penjualan</button>
                             </div>
-                            <div class="max-h-[500px] overflow-y-auto">
+                            <div class="max-h-[700px] overflow-y-auto">
                                 <table class="w-full text-left text-sm">
-                                    <thead class="bg-stone-50 text-[10px] font-black uppercase text-stone-400 tracking-widest">
-                                        <tr><th class="px-8 py-4">Waktu</th><th class="px-8 py-4">Produk</th><th class="px-8 py-4 text-right">Harga</th></tr>
+                                    <thead class="bg-stone-50 text-[10px] font-black uppercase text-stone-400 tracking-widest sticky top-0 shadow-sm">
+                                        <tr>
+                                            <th class="px-6 py-4">Hari & Tanggal</th>
+                                            <th class="px-6 py-4">Sumber Penjualan</th>
+                                            <th class="px-6 py-4">Varian & Ukuran</th>
+                                            <th class="px-6 py-4 text-center">Jumlah (Qty)</th>
+                                            <th class="px-6 py-4 text-right">Total Omzet</th>
+                                        </tr>
                                     </thead>
                                     <tbody class="divide-y divide-stone-50">
-                                        ${state.sales.length === 0 ? '<tr><td colspan="3" class="px-8 py-20 text-center text-stone-300 italic">Belum ada data</td></tr>' : 
-                                          state.sales.map(s => `
-                                            <tr class="hover:bg-stone-50/50">
-                                                <td class="px-8 py-4 text-stone-400 text-xs">${s.date}</td>
-                                                <td class="px-8 py-4 font-black">${s.name}</td>
-                                                <td class="px-8 py-4 text-right font-black text-amber-700">${formatIDR(s.price)}</td>
+                                        ${groupedSales.length === 0 ? '<tr><td colspan="5" class="px-6 py-20 text-center text-stone-300 italic font-bold">Belum ada data transaksi</td></tr>' : 
+                                          groupedSales.map(s => {
+                                            const isReseller = s.resellerId != null;
+                                            const nameParts = s.name.split('|');
+                                            const displayName = nameParts[0];
+                                            const displaySize = nameParts[1] || '';
+                                            
+                                            return `
+                                            <tr class="hover:bg-stone-50/50 transition-colors">
+                                                <td class="px-6 py-4 text-stone-500 text-xs">${s.date}</td>
+                                                <td class="px-6 py-4 text-xs font-bold ${isReseller ? 'text-amber-600' : 'text-stone-500'}">
+                                                    <div class="flex items-center gap-1">${isReseller ? '<i data-lucide="users" class="w-3 h-3"></i> Reseller: ' + s.resellerName : '<i data-lucide="user" class="w-3 h-3"></i> Milik Sendiri'}</div>
+                                                </td>
+                                                <td class="px-6 py-4">
+                                                    <div class="font-black text-stone-800">${displayName}</div>
+                                                    ${displaySize ? `<div class="text-[10px] text-stone-400 font-bold bg-stone-100 px-2 py-0.5 rounded-md inline-block mt-1">${displaySize}</div>` : ''}
+                                                </td>
+                                                <td class="px-6 py-4 text-center font-black text-lg text-stone-700">${s.qty}</td>
+                                                <td class="px-6 py-4 text-right">
+                                                    <div class="font-black text-amber-700">${formatIDR(s.totalOmzet)}</div>
+                                                    ${isReseller ? `<div class="text-[9px] text-green-600 font-bold mt-0.5" title="Telah dipotong untuk reseller">- Hak Reseller: ${formatIDR(s.totalProfitReseller)}</div>` : ''}
+                                                </td>
                                             </tr>
-                                          `).join('')}
+                                          `}).join('')}
                                     </tbody>
                                 </table>
                             </div>
@@ -439,33 +861,36 @@
             const allocatedOverhead = monthlyOverhead / divisor;
             const allocatedDepreciation = monthlyDepreciation / divisor;
 
-            const revenue = reportData.reduce((a, b) => a + b.price, 0);
+            const revenue = reportData.reduce((a, b) => a + (b.price - (b.resellerProfit || 0)), 0);
             const ingredientCosts = reportData.reduce((a, b) => a + b.recordedIngredientCost, 0);
             const netProfit = revenue - ingredientCosts - allocatedOverhead - allocatedDepreciation;
+            const totalUnitsSold = reportData.length;
 
             const bepMetrics = calculateBEPMetrics();
             let bepTarget = bepMetrics.bepUnits;
             if (state.reportFilter === 'daily') bepTarget = Math.ceil(bepMetrics.bepUnits / 30);
             if (state.reportFilter === 'weekly') bepTarget = Math.ceil(bepMetrics.bepUnits / 4.28);
-            const isBepReached = reportData.length >= bepTarget;
+            const isBepReached = totalUnitsSold >= bepTarget;
+
+            const groupedReportData = getGroupedSales(reportData);
 
             el.innerHTML = `
                 <div class="space-y-6 animate-fade-in">
                     <div class="bg-white p-6 rounded-3xl border border-stone-100 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
                         <div class="flex items-center gap-3">
                             <div class="bg-amber-100 p-3 rounded-2xl"><i data-lucide="bar-chart-3" class="text-amber-800 w-6 h-6"></i></div>
-                            <div><h3 class="text-xl font-black text-stone-800">Laporan Laba Rugi Akurat</h3><p class="text-xs text-stone-400">Termasuk beban overhead dan depresiasi aset</p></div>
+                            <div><h3 class="text-xl font-black text-stone-800">Laporan Laba Rugi Akurat</h3><p class="text-xs text-stone-400">Termasuk potongan reseller, beban overhead, dan depresiasi aset</p></div>
                         </div>
                         <div class="flex bg-stone-100 p-1 rounded-xl">
                             <button onclick="state.reportFilter='daily'; render();" class="px-4 py-2 rounded-lg text-xs font-bold ${state.reportFilter==='daily'?'bg-white text-amber-800 shadow-sm':'text-stone-400'}">Hari Ini</button>
-                            <button onclick="state.reportFilter='weekly'; render();" class="px-4 py-2 rounded-lg text-xs font-bold ${state.reportFilter==='weekly'?'bg-white text-amber-800 shadow-sm':'text-stone-400'}">7 Hari</button>
-                            <button onclick="state.reportFilter='monthly'; render();" class="px-4 py-2 rounded-lg text-xs font-bold ${state.reportFilter==='monthly'?'bg-white text-amber-800 shadow-sm':'text-stone-400'}">Bulan Ini</button>
+                            <button onclick="state.reportFilter='weekly'; render();" class="px-4 py-2 rounded-lg text-xs font-bold ${state.reportFilter==='weekly'?'bg-white text-amber-800 shadow-sm':'text-stone-400'}">Mingguan</button>
+                            <button onclick="state.reportFilter='monthly'; render();" class="px-4 py-2 rounded-lg text-xs font-bold ${state.reportFilter==='monthly'?'bg-white text-amber-800 shadow-sm':'text-stone-400'}">Bulanan</button>
                         </div>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
                         <div class="bg-white p-6 rounded-3xl border border-stone-100 shadow-sm">
-                            <p class="text-stone-400 text-[10px] font-black uppercase tracking-widest mb-1">Omzet</p>
+                            <p class="text-stone-400 text-[10px] font-black uppercase tracking-widest mb-1">Omzet Bersih</p>
                             <h4 class="text-lg font-black">${formatIDR(revenue)}</h4>
                         </div>
                         <div class="bg-white p-6 rounded-3xl border border-stone-100 shadow-sm">
@@ -490,12 +915,12 @@
                         <div class="flex justify-between items-end">
                             <div>
                                 <p class="text-stone-400 text-[10px] font-black uppercase tracking-widest mb-1">Status Balik Modal (BEP) - ${state.reportFilter === 'daily' ? 'Harian' : state.reportFilter === 'weekly' ? 'Mingguan' : 'Bulanan'}</p>
-                                <h4 class="text-lg font-black ${isBepReached ? 'text-green-600' : 'text-indigo-600'}">${reportData.length} / ${bepTarget} Botol Terjual</h4>
+                                <h4 class="text-lg font-black ${isBepReached ? 'text-green-600' : 'text-indigo-600'}">${totalUnitsSold} / ${bepTarget} Botol Terjual</h4>
                             </div>
                             <span class="text-xs font-bold px-3 py-1 rounded-full ${isBepReached ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}">${isBepReached ? 'Balik Modal Tercapai \u2713' : 'Belum Balik Modal'}</span>
                         </div>
                         <div class="w-full bg-stone-100 rounded-full h-3 overflow-hidden">
-                            <div class="h-3 rounded-full transition-all duration-500 ${isBepReached ? 'bg-green-500' : 'bg-indigo-500'}" style="width: ${Math.min((reportData.length / (bepTarget || 1)) * 100, 100)}%"></div>
+                            <div class="h-3 rounded-full transition-all duration-500 ${isBepReached ? 'bg-green-500' : 'bg-indigo-500'}" style="width: ${Math.min((totalUnitsSold / (bepTarget || 1)) * 100, 100)}%"></div>
                         </div>
                         <p class="text-[10px] text-stone-400 mt-1">Dihitung berdasarkan rata-rata margin untuk menutupi seluruh biaya operasional & penyusutan aset periode ini.</p>
                     </div>
@@ -503,7 +928,7 @@
                     ${netProfit < 0 ? `
                         <div class="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex items-center gap-3">
                             <i data-lucide="alert-triangle" class="text-amber-600"></i>
-                            <p class="text-xs text-amber-800"><b>Rugi Terdeteksi:</b> Penjualan belum cukup untuk menutup biaya operasional harian Anda.</p>
+                            <p class="text-xs text-amber-800"><b>Rugi Terdeteksi:</b> Penjualan belum cukup untuk menutup biaya operasional Anda.</p>
                         </div>
                     ` : ''}
 
@@ -511,16 +936,36 @@
                         <div class="p-6 border-b border-stone-50 font-black">Detail Transaksi</div>
                         <table class="w-full text-left text-sm">
                             <thead class="bg-stone-50 text-[10px] font-black uppercase text-stone-400 tracking-widest">
-                                <tr><th class="px-8 py-4">Waktu</th><th class="px-8 py-4">Varian</th><th class="px-8 py-4 text-right">Laba Kotor/Botol</th></tr>
+                                <tr>
+                                    <th class="px-6 py-4">Hari & Tanggal</th>
+                                    <th class="px-6 py-4">Sumber Penjualan</th>
+                                    <th class="px-6 py-4">Varian & Ukuran</th>
+                                    <th class="px-6 py-4 text-center">Jumlah (Qty)</th>
+                                    <th class="px-6 py-4 text-right">Laba Kotor (Owner)</th>
+                                </tr>
                             </thead>
                             <tbody class="divide-y divide-stone-50">
-                                ${reportData.map(s => `
-                                    <tr>
-                                        <td class="px-8 py-4 text-stone-400 text-xs">${s.date}</td>
-                                        <td class="px-8 py-4 font-bold">${s.name}</td>
-                                        <td class="px-8 py-4 text-right font-black text-green-600">${formatIDR(s.price - s.recordedIngredientCost)}</td>
+                                ${groupedReportData.map(s => {
+                                    const actualRevenue = s.totalOmzet - s.totalProfitReseller;
+                                    const grossProfit = actualRevenue - s.totalIngCost;
+                                    const isReseller = s.resellerId != null;
+                                    const nameParts = s.name.split('|');
+                                    const displayName = nameParts[0];
+                                    const displaySize = nameParts[1] || '';
+
+                                    return `
+                                    <tr class="hover:bg-stone-50/50 transition-colors">
+                                        <td class="px-6 py-4 text-stone-500 text-xs">${s.date}</td>
+                                        <td class="px-6 py-4 font-bold text-xs ${isReseller ? 'text-amber-600' : 'text-stone-500'}">${isReseller ? s.resellerName : 'Milik Sendiri'}</td>
+                                        <td class="px-6 py-4">
+                                            <div class="font-black">${displayName}</div>
+                                            ${displaySize ? `<div class="text-[10px] font-bold text-stone-400">${displaySize}</div>` : ''}
+                                        </td>
+                                        <td class="px-6 py-4 text-center font-black">${s.qty}</td>
+                                        <td class="px-6 py-4 text-right font-black text-green-600">${formatIDR(grossProfit)}</td>
                                     </tr>
-                                `).join('')}
+                                `}).join('')}
+                                ${groupedReportData.length === 0 ? '<tr><td colspan="5" class="px-6 py-10 text-center text-stone-400 italic font-bold">Belum ada data untuk periode ini</td></tr>' : ''}
                             </tbody>
                         </table>
                     </div>
@@ -536,27 +981,27 @@
                     <!-- 1. GUDANG -->
                     <section class="bg-white p-8 rounded-[32px] border border-stone-100 shadow-sm">
                         <div class="flex justify-between items-center mb-6">
-                            <div><h3 class="text-xl font-black flex items-center gap-2"><i data-lucide="database" class="text-amber-600"></i> 1. Gudang Bahan Baku</h3><p class="text-xs text-stone-400">Harga bahan dasar yang Anda beli beserta jumlah stoknya</p></div>
+                            <div><h3 class="text-xl font-black flex items-center gap-2"><i data-lucide="database" class="text-amber-600"></i> 1. Gudang Bahan Baku (Mingguan)</h3><p class="text-xs text-stone-400">Total budget belanja dan jumlah stok bahan baku yang Anda siapkan untuk 1 minggu</p></div>
                             <button onclick="addIngredient()" class="bg-stone-900 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-stone-800">+ Tambah</button>
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             ${state.ingredients.map(ing => `
-                                <div class="p-4 bg-stone-50 rounded-2xl border border-stone-100 flex flex-col gap-3">
+                                <div class="p-4 bg-stone-50 rounded-2xl border border-stone-100 flex flex-col gap-3 relative hover:border-amber-300 transition-colors">
                                     <div class="flex justify-between items-center">
-                                        <input id="ing-name-${ing.id}" class="bg-transparent font-black text-sm w-full outline-none text-stone-800" value="${ing.name}" onchange="updateIng(${ing.id}, 'name', this.value)" placeholder="Nama Bahan Baku">
-                                        <button onclick="delIng(${ing.id})" class="text-red-300 hover:text-red-500 ml-2"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                        <input id="ing-name-${ing.id}" class="bg-transparent font-black text-sm w-full outline-none text-stone-800 placeholder-stone-300" value="${ing.name}" onchange="updateIng(${ing.id}, 'name', this.value)" placeholder="Nama Bahan Baku">
+                                        <button onclick="delIng(${ing.id})" class="text-stone-300 hover:text-red-500 ml-2 transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                                     </div>
                                     <div class="grid grid-cols-2 gap-3">
                                         <div class="flex flex-col gap-1">
-                                            <label class="text-[9px] font-black text-stone-400 uppercase tracking-widest">Harga Beli Total</label>
-                                            <div class="flex items-center gap-1 bg-white px-2 py-1.5 rounded-lg border border-stone-200">
+                                            <label class="text-[8px] font-black text-stone-400 uppercase tracking-widest">Belanja 1 Minggu</label>
+                                            <div class="flex items-center gap-1 bg-white px-2 py-1.5 rounded-lg border border-stone-200 focus-within:border-amber-400 transition-colors">
                                                 <span class="text-[10px] text-stone-400 font-bold">Rp</span>
                                                 <input id="ing-cost-${ing.id}" class="w-full text-xs font-bold outline-none" type="number" value="${ing.cost}" onchange="updateIng(${ing.id}, 'cost', parseFloat(this.value))">
                                             </div>
                                         </div>
                                         <div class="flex flex-col gap-1">
-                                            <label class="text-[9px] font-black text-stone-400 uppercase tracking-widest">Jumlah & Satuan</label>
-                                            <div class="flex items-center gap-1 bg-white px-2 py-1.5 rounded-lg border border-stone-200">
+                                            <label class="text-[8px] font-black text-stone-400 uppercase tracking-widest">Stok 1 Minggu</label>
+                                            <div class="flex items-center gap-1 bg-white px-2 py-1.5 rounded-lg border border-stone-200 focus-within:border-amber-400 transition-colors">
                                                 <input id="ing-bulk-${ing.id}" class="w-full text-xs font-bold outline-none text-right" type="number" value="${ing.bulkAmount}" onchange="updateIng(${ing.id}, 'bulkAmount', parseFloat(this.value))">
                                                 <select id="ing-unit-${ing.id}" class="text-[10px] bg-transparent font-bold outline-none border-l pl-1 text-amber-700" onchange="updateIng(${ing.id}, 'unit', this.value)">
                                                     <option value="g" ${ing.unit === 'g' ? 'selected' : ''}>g</option>
@@ -642,7 +1087,10 @@
                                 <div class="space-y-2">
                                     ${state.variants.map(v => `
                                         <button onclick="state.editingVariantId=${v.id}; render();" class="w-full flex justify-between items-center p-4 rounded-2xl border ${state.editingVariantId===v.id?'border-amber-600 bg-amber-50':'border-stone-50'}">
-                                            <span class="font-bold text-sm">${v.name}</span>
+                                            <div class="flex flex-col text-left">
+                                                <span class="font-bold text-sm text-stone-800">${v.name}</span>
+                                                <span class="text-[10px] font-bold text-stone-400 mt-1">${v.bottleSize || '250 ml'}</span>
+                                            </div>
                                             <i data-lucide="chevron-right" class="w-4 h-4 ${state.editingVariantId===v.id?'text-amber-600':'text-stone-300'}"></i>
                                         </button>
                                     `).join('')}
@@ -653,11 +1101,30 @@
                         <div class="md:col-span-8">
                             ${currentVariant ? `
                                 <div class="bg-white p-8 rounded-[32px] border border-stone-100 shadow-sm space-y-6">
-                                    <h3 class="text-xl font-black">Edit Komposisi: ${currentVariant.name}</h3>
-                                    <div class="grid grid-cols-2 gap-4">
-                                        <div class="bg-stone-50 p-3 rounded-xl"><label class="text-[10px] font-black text-stone-400 uppercase">Nama</label><input id="var-name-${currentVariant.id}" class="w-full bg-transparent font-bold outline-none" value="${currentVariant.name}" onchange="updateVar(${currentVariant.id}, 'name', this.value)"></div>
-                                        <div class="bg-stone-50 p-3 rounded-xl"><label class="text-[10px] font-black text-stone-400 uppercase">Harga</label><input id="var-price-${currentVariant.id}" class="w-full bg-transparent font-bold text-amber-700 outline-none" type="number" value="${currentVariant.price}" onchange="updateVar(${currentVariant.id}, 'price', parseInt(this.value))"></div>
+                                    <div class="flex justify-between items-center">
+                                        <h3 class="text-xl font-black">Edit Komposisi: ${currentVariant.name}</h3>
+                                        <button onclick="if(confirm('Hapus varian ini?')){ delVariant(${currentVariant.id}); }" class="text-red-400 hover:text-red-600 bg-red-50 p-2 rounded-lg"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
                                     </div>
+                                    
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div class="bg-stone-50 p-3 rounded-xl md:col-span-1">
+                                            <label class="text-[10px] font-black text-stone-400 uppercase">Ukuran Botol</label>
+                                            <select id="var-size-${currentVariant.id}" class="w-full bg-transparent font-bold outline-none text-stone-800 mt-1" onchange="updateVar(${currentVariant.id}, 'bottleSize', this.value)">
+                                                <option value="250 ml" ${currentVariant.bottleSize === '250 ml' ? 'selected' : ''}>250 ml</option>
+                                                <option value="500 ml" ${currentVariant.bottleSize === '500 ml' ? 'selected' : ''}>500 ml</option>
+                                                <option value="1 Liter" ${currentVariant.bottleSize === '1 Liter' ? 'selected' : ''}>1 Liter</option>
+                                            </select>
+                                        </div>
+                                        <div class="bg-stone-50 p-3 rounded-xl md:col-span-1">
+                                            <label class="text-[10px] font-black text-stone-400 uppercase">Nama</label>
+                                            <input id="var-name-${currentVariant.id}" class="w-full bg-transparent font-bold outline-none mt-1" value="${currentVariant.name}" onchange="updateVar(${currentVariant.id}, 'name', this.value)">
+                                        </div>
+                                        <div class="bg-stone-50 p-3 rounded-xl md:col-span-1">
+                                            <label class="text-[10px] font-black text-stone-400 uppercase">Harga</label>
+                                            <input id="var-price-${currentVariant.id}" class="w-full bg-transparent font-bold text-amber-700 outline-none mt-1" type="number" value="${currentVariant.price}" onchange="updateVar(${currentVariant.id}, 'price', parseInt(this.value))">
+                                        </div>
+                                    </div>
+
                                     <div class="space-y-3">
                                         <p class="text-[10px] font-black text-stone-400 uppercase tracking-widest">Resep per Botol</p>
                                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -691,7 +1158,6 @@
                             <p class="text-xs text-red-600/70 mt-1 font-medium">Tindakan ini akan menghapus data secara permanen dari database cloud.</p>
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <!-- FUNGSI KLIK MENGGUNAKAN MODAL KUSTOM: promptReset() -->
                             <button onclick="promptReset('sales')" class="p-4 bg-white border border-red-200 rounded-2xl text-left hover:bg-red-100 transition-colors shadow-sm">
                                 <h4 class="font-bold text-red-800 text-sm mb-1">Riwayat Penjualan</h4>
                                 <p class="text-[10px] text-red-500 leading-tight">Hapus semua data transaksi kasir dan laporan laba.</p>
@@ -714,7 +1180,7 @@
             `;
         }
 
-        // --- SISTEM PEMANGGIL MODAL KONFIRMASI (MENGGANTIKAN ALERT/CONFIRM) ---
+        // --- SISTEM PEMANGGIL MODAL KONFIRMASI ---
         window.promptReset = (type) => {
             let targetName = "";
             if (type === 'sales') targetName = "Riwayat Penjualan";
@@ -757,21 +1223,39 @@
                     state.variants = [];
                     state.editingVariantId = null;
                 }
+                if (type === 'all') {
+                    const { error: e5 } = await supabaseClient.from('resellers').delete().gt('id', 0);
+                    if (e5) throw e5;
+                    state.resellers = [];
+                }
                 
                 render();
-                
-                // Beri sedikit jeda agar animasi terasa halus
-                setTimeout(() => {
-                    showModal('alert', 'Berhasil!', 'Data telah dihapus bersih dari sistem.');
-                }, 200);
-
+                setTimeout(() => { showModal('alert', 'Berhasil!', 'Data telah dihapus bersih dari sistem.'); }, 200);
             } catch (error) {
                 console.error("Gagal menghapus data:", error);
-                showModal('alert', 'Gagal Menghapus', 'Perintah ditolak oleh Supabase. Pastikan Anda sudah menjalankan query SQL: ALTER TABLE [nama_tabel] DISABLE ROW LEVEL SECURITY;');
+                showModal('alert', 'Gagal Menghapus', 'Perintah ditolak oleh Supabase.');
             }
         };
 
         // --- CRUD HELPERS (OPTIMISTIC UPDATES) ---
+        window.addReseller = () => {
+            const newItem = { id: Date.now(), name: 'Toko Baru', phone: '', discountRate: 15 };
+            supabaseClient.from('resellers').insert([newItem]).then();
+            state.resellers.push(newItem);
+            render();
+        };
+        window.updateReseller = (id, f, v) => {
+            supabaseClient.from('resellers').update({ [f]: v }).eq('id', id).then();
+            const r = state.resellers.find(x => x.id === id);
+            if (r) r[f] = v;
+            render();
+        };
+        window.delReseller = (id) => {
+            supabaseClient.from('resellers').delete().eq('id', id).then();
+            state.resellers = state.resellers.filter(x => x.id !== id);
+            render();
+        };
+
         window.addIngredient = () => {
             const newItem = { id: Date.now(), name: 'Bahan Baru', cost: 0, bulkAmount: 1000, unit: 'g' };
             supabaseClient.from('ingredients').insert([newItem]).then();
@@ -810,16 +1294,32 @@
 
         window.addVariant = () => {
             const nid = Date.now();
-            const newItem = { id: nid, name: 'Varian Baru', price: 0, recipe: [] };
-            supabaseClient.from('variants').insert([newItem]).then();
-            state.variants.push(newItem);
+            // Trik khusus agar bottleSize dapat tersimpan di Supabase tanpa mengubah skema (diselipkan di resep)
+            const dbItem = { id: nid, name: 'Varian Baru', price: 0, recipe: [{ ingId: 'SIZE', qty: '250 ml' }] };
+            supabaseClient.from('variants').insert([dbItem]).then();
+            
+            state.variants.push({ id: nid, name: 'Varian Baru', bottleSize: '250 ml', price: 0, recipe: [] });
             state.editingVariantId = nid;
             render();
         };
+        window.delVariant = (id) => {
+            supabaseClient.from('variants').delete().eq('id', id).then();
+            state.variants = state.variants.filter(x => x.id !== id);
+            state.editingVariantId = null;
+            render();
+        };
         window.updateVar = (id, f, v) => {
-            supabaseClient.from('variants').update({ [f]: v }).eq('id', id).then();
             const x = state.variants.find(y => y.id === id);
-            if (x) x[f] = v;
+            if (x) {
+                x[f] = v;
+                if (f === 'bottleSize') {
+                    // Update ukuran botol lewat array JSON
+                    const dbRecipe = [...x.recipe, { ingId: 'SIZE', qty: v }];
+                    supabaseClient.from('variants').update({ recipe: dbRecipe }).eq('id', id).then();
+                } else {
+                    supabaseClient.from('variants').update({ [f]: v }).eq('id', id).then();
+                }
+            }
             render();
         };
         window.updateRecipe = (vid, iid, qty) => {
@@ -828,8 +1328,11 @@
                 const other = v.recipe.filter(r => r.ingId !== iid);
                 const q = parseFloat(qty);
                 const newRecipe = q > 0 ? [...other, { ingId: iid, qty: q }] : other;
-                supabaseClient.from('variants').update({ recipe: newRecipe }).eq('id', vid).then();
                 v.recipe = newRecipe;
+                
+                // Pastikan ukuran botol ikut diselipkan
+                const dbRecipe = [...newRecipe, { ingId: 'SIZE', qty: v.bottleSize || '250 ml' }];
+                supabaseClient.from('variants').update({ recipe: dbRecipe }).eq('id', vid).then();
             }
             render();
         };
