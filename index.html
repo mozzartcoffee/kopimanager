@@ -3,15 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KopiManager Pro - Sistem POS Kopi Modern</title>
+    <title>Mozzart Coffee Manager - Sistem POS Kopi Modern</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     
     <!-- Supabase JS Client -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        // Konfigurasi Tema Dinamis Tailwind
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: 'var(--primary-50)',
+                            100: 'var(--primary-100)',
+                            200: 'var(--primary-200)',
+                            300: 'var(--primary-300)',
+                            400: 'var(--primary-400)',
+                            500: 'var(--primary-500)',
+                            600: 'var(--primary-600)',
+                            700: 'var(--primary-700)',
+                            800: 'var(--primary-800)',
+                            900: 'var(--primary-900)',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;700;800&display=swap');
         
+        :root {
+            /* Default Warna Amber */
+            --primary-50: #fffbeb; --primary-100: #fef3c7; --primary-200: #fde68a; --primary-300: #fcd34d;
+            --primary-400: #fbbf24; --primary-500: #f59e0b; --primary-600: #d97706; --primary-700: #b45309;
+            --primary-800: #92400e; --primary-900: #78350f;
+        }
+
         body { 
             font-family: 'Inter', sans-serif; 
             background-color: #f8fafc; 
@@ -19,7 +49,7 @@
         }
         h1, h2, h3, h4, h5, .font-heading { font-family: 'Plus Jakarta Sans', sans-serif; }
         
-        /* Scrollbar custom tipis dan modern untuk mengganti no-scrollbar */
+        /* Scrollbar custom tipis */
         .thin-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
         .thin-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .thin-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
@@ -45,20 +75,20 @@
     <!-- LOGIN OVERLAY -->
     <div id="login-screen" class="fixed inset-0 z-50 bg-slate-50 flex items-center justify-center p-4">
         <div class="max-w-sm w-full bg-white p-8 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 animate-fade-in text-center">
-            <div class="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto mb-5 text-amber-600">
-                <i data-lucide="coffee" class="w-8 h-8"></i>
+            <div id="login-logo-container" class="w-16 h-16 bg-primary-50 rounded-2xl flex items-center justify-center mx-auto mb-5 text-primary-600">
+                <!-- Logo akan diinject via JS -->
             </div>
-            <h1 class="text-2xl font-heading font-extrabold text-slate-900 tracking-tight mb-1">KopiManager<span class="text-amber-500">.</span></h1>
-            <p class="text-slate-500 text-xs font-medium mb-8">Manajemen Kopi Botolan Pro</p>
+            <h1 class="text-2xl font-heading font-extrabold text-slate-900 tracking-tight mb-1">Mozzart Coffee<span class="text-primary-500">.</span></h1>
+            <p class="text-slate-500 text-xs font-medium mb-8">Manajemen Kafe & POS Pro</p>
             
             <form id="login-form" class="space-y-3">
                 <div class="relative">
                     <i data-lucide="mail" class="absolute left-4 top-3.5 text-slate-400 w-4 h-4"></i>
-                    <input type="email" id="email" class="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all" placeholder="Email Anda" required>
+                    <input type="email" id="email" class="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all" placeholder="Email Anda" required>
                 </div>
                 <div class="relative">
                     <i data-lucide="lock" class="absolute left-4 top-3.5 text-slate-400 w-4 h-4"></i>
-                    <input type="password" id="password" class="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all" placeholder="Password" required>
+                    <input type="password" id="password" class="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all" placeholder="Password" required>
                 </div>
                 <p id="login-error" class="text-red-500 text-[10px] font-bold text-left px-2 hidden">Email atau password salah.</p>
                 <button type="submit" class="w-full bg-slate-900 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-slate-800 transition-all shadow-md active:scale-[0.98] mt-2 text-sm">
@@ -75,7 +105,8 @@
         <aside class="hidden md:flex flex-col w-64 bg-white border-r border-slate-200 h-full flex-shrink-0">
             <div class="p-6">
                 <h1 class="text-xl font-heading font-extrabold flex items-center gap-2 tracking-tight text-slate-900">
-                    <i data-lucide="coffee" class="text-amber-600 w-6 h-6"></i> KopiManager
+                    <span id="sidebar-logo-container" class="shrink-0 flex items-center justify-center"></span>
+                    Mozzart Coffee
                 </h1>
             </div>
             <nav class="flex-1 px-4 py-2 space-y-1 overflow-y-auto thin-scrollbar">
@@ -87,7 +118,7 @@
                 
                 <p class="px-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 mt-6">Manajemen</p>
                 <button onclick="switchTab('reseller')" id="nav-desktop-reseller" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all text-slate-500 hover:bg-slate-50"><i data-lucide="users" class="w-4 h-4"></i> Reseller</button>
-                <button onclick="switchTab('pengaturan')" id="nav-desktop-pengaturan" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all text-slate-500 hover:bg-slate-50"><i data-lucide="sliders" class="w-4 h-4"></i> Resep & Gudang</button>
+                <button onclick="switchTab('pengaturan')" id="nav-desktop-pengaturan" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all text-slate-500 hover:bg-slate-50"><i data-lucide="sliders" class="w-4 h-4"></i> Pengaturan</button>
             </nav>
             <div class="p-4 border-t border-slate-100">
                 <button onclick="logout()" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-red-500 hover:bg-red-50 transition-all"><i data-lucide="log-out" class="w-4 h-4"></i> Keluar</button>
@@ -99,7 +130,7 @@
             <!-- MOBILE HEADER (Sticky) -->
             <header class="md:hidden glass z-30 px-5 py-4 border-b border-slate-200 flex justify-between items-center sticky top-0">
                 <h1 class="text-lg font-heading font-extrabold flex items-center gap-2">
-                    <i data-lucide="coffee" class="text-amber-600 w-5 h-5"></i> KopiManager
+                    <span id="mobile-logo-container" class="flex shrink-0"></span> Mozzart Coffee
                 </h1>
                 <button onclick="logout()" class="text-slate-400 hover:text-red-500 p-1"><i data-lucide="log-out" class="w-5 h-5"></i></button>
             </header>
@@ -134,6 +165,15 @@
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind2aWRrcHhhdXZhZGp5a3Jrc2FuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2ODk4ODAsImV4cCI6MjA4NzI2NTg4MH0.hhUVmvDs690jFF6osVyYBeIcaPaROtJV1tEA1QUb-GY';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+        // --- DAFTAR TEMA WARNA ---
+        const THEMES = {
+            amber: { 50: '#fffbeb', 100: '#fef3c7', 200: '#fde68a', 300: '#fcd34d', 400: '#fbbf24', 500: '#f59e0b', 600: '#d97706', 700: '#b45309', 800: '#92400e', 900: '#78350f' },
+            emerald: { 50: '#ecfdf5', 100: '#d1fae5', 200: '#a7f3d0', 300: '#6ee7b7', 400: '#34d399', 500: '#10b981', 600: '#059669', 700: '#047857', 800: '#065f46', 900: '#064e3b' },
+            blue: { 50: '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe', 300: '#93c5fd', 400: '#60a5fa', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8', 800: '#1e40af', 900: '#1e3a8a' },
+            rose: { 50: '#fff1f2', 100: '#ffe4e6', 200: '#fecdd3', 300: '#fda4af', 400: '#fb7185', 500: '#f43f5e', 600: '#e11d48', 700: '#be123c', 800: '#9f1239', 900: '#881337' },
+            slate: { 50: '#f8fafc', 100: '#f1f5f9', 200: '#e2e8f0', 300: '#cbd5e1', 400: '#94a3b8', 500: '#64748b', 600: '#475569', 700: '#334155', 800: '#1e293b', 900: '#0f172a' }
+        };
+
         // --- APP STATE ---
         let state = {
             isLoggedIn: false,
@@ -151,8 +191,73 @@
             targetQty: 500,
             variants: [],
             sales: [],
-            modal: { isOpen: false, type: 'alert', title: '', message: '', onConfirm: null }
+            modal: { isOpen: false, type: 'alert', title: '', message: '', onConfirm: null },
+            theme: 'amber',
+            logoUrl: null
         };
+
+        // --- THEME & LOGO INITS ---
+        function initThemeAndLogo() {
+            const storedTheme = localStorage.getItem('mozzart_theme') || 'amber';
+            state.theme = storedTheme;
+            applyTheme(storedTheme);
+            
+            state.logoUrl = localStorage.getItem('mozzart_logo');
+            updateAppUI();
+        }
+
+        function applyTheme(colorKey) {
+            const colors = THEMES[colorKey] || THEMES.amber;
+            const root = document.documentElement;
+            for (const [weight, hex] of Object.entries(colors)) {
+                root.style.setProperty(`--primary-${weight}`, hex);
+            }
+        }
+
+        window.changeTheme = (themeName) => {
+            state.theme = themeName;
+            applyTheme(themeName);
+            localStorage.setItem('mozzart_theme', themeName);
+            render(); 
+        };
+
+        window.handleLogoUpload = (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const base64 = e.target.result;
+                    state.logoUrl = base64;
+                    localStorage.setItem('mozzart_logo', base64);
+                    updateAppUI();
+                    if(state.activeTab === 'pengaturan') render();
+                };
+                reader.readAsDataURL(file);
+            }
+        };
+
+        window.resetLogo = () => {
+            state.logoUrl = null;
+            localStorage.removeItem('mozzart_logo');
+            updateAppUI();
+            if(state.activeTab === 'pengaturan') render();
+        };
+
+        function updateAppUI() {
+            const logoHtmlLarge = state.logoUrl ? `<img src="${state.logoUrl}" class="w-full h-full object-cover rounded-2xl">` : `<i data-lucide="coffee" class="w-8 h-8 text-primary-600"></i>`;
+            const logoHtmlSmall = state.logoUrl ? `<img src="${state.logoUrl}" class="w-7 h-7 object-cover rounded-md border border-slate-200">` : `<i data-lucide="coffee" class="text-primary-600 w-6 h-6"></i>`;
+            const logoHtmlMobile = state.logoUrl ? `<img src="${state.logoUrl}" class="w-5 h-5 object-cover rounded border border-slate-200">` : `<i data-lucide="coffee" class="text-primary-600 w-5 h-5"></i>`;
+            
+            const loginEl = document.getElementById('login-logo-container');
+            const sideEl = document.getElementById('sidebar-logo-container');
+            const mobEl = document.getElementById('mobile-logo-container');
+            
+            if(loginEl) loginEl.innerHTML = logoHtmlLarge;
+            if(sideEl) sideEl.innerHTML = logoHtmlSmall;
+            if(mobEl) mobEl.innerHTML = logoHtmlMobile;
+            
+            lucide.createIcons();
+        }
 
         // --- CUSTOM MODAL UI SYSTEM ---
         window.showModal = (type, title, message, onConfirm = null) => {
@@ -179,7 +284,7 @@
             container.innerHTML = `
                 <div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-fade-in">
                     <div class="bg-white rounded-3xl p-6 w-full max-w-sm shadow-xl border border-slate-100">
-                        <div class="w-10 h-10 rounded-full ${state.modal.type === 'confirm' ? 'bg-red-50 text-red-500' : 'bg-amber-50 text-amber-500'} flex items-center justify-center mb-4">
+                        <div class="w-10 h-10 rounded-full ${state.modal.type === 'confirm' ? 'bg-red-50 text-red-500' : 'bg-primary-50 text-primary-500'} flex items-center justify-center mb-4">
                             <i data-lucide="${state.modal.type === 'confirm' ? 'alert-triangle' : 'info'}" class="w-5 h-5"></i>
                         </div>
                         <h3 class="text-lg font-heading font-bold text-slate-800 mb-1">${state.modal.title}</h3>
@@ -386,10 +491,10 @@
             }).join('');
             const html = `<div style="font-family: sans-serif; max-width: 800px; margin: 0 auto; padding: 40px;">
                 <h1 style="text-align:center; color:#0f172a; margin-bottom:4px;">INVOICE MITRA</h1>
-                <p style="text-align:center; color:#64748b; margin-top:0;">KopiManager Pro</p>
-                <div style="display:flex; justify-content:space-between; margin:30px 0; background:#f8fafc; padding:20px; border-radius:12px; border:1px solid #e2e8f0;">
+                <p style="text-align:center; color:#64748b; margin-top:0;">Mozzart Coffee Manager</p>
+                <div style="display:flex; justify-content:space-between; margin:30px 0; background:var(--primary-50); padding:20px; border-radius:12px; border:1px solid var(--primary-200);">
                     <div><p style="margin:0; font-size:12px; color:#64748b;">Mitra</p><h3 style="margin:4px 0;">${r.name}</h3></div>
-                    <div style="text-align:right;"><p style="margin:0; font-size:12px; color:#64748b;">Tanggal</p><h3 style="margin:4px 0;">${new Date().toLocaleDateString('id-ID')}</h3><p style="margin:0; color:#b45309; font-size:14px; font-weight:bold;">Diskon: ${r.discountRate}%</p></div>
+                    <div style="text-align:right;"><p style="margin:0; font-size:12px; color:#64748b;">Tanggal</p><h3 style="margin:4px 0;">${new Date().toLocaleDateString('id-ID')}</h3><p style="margin:0; color:var(--primary-700); font-size:14px; font-weight:bold;">Diskon: ${r.discountRate}%</p></div>
                 </div>
                 <table style="width:100%; border-collapse:collapse; margin-bottom:30px; font-size:14px;">
                     <thead><tr style="background:#f1f5f9; text-transform:uppercase; font-size:11px; color:#64748b;">
@@ -398,10 +503,10 @@
                     <tbody>${tableHtml}</tbody>
                 </table>
                 <div style="display:flex; justify-content:flex-end;">
-                    <div style="width:300px; padding:20px; background:#fffbeb; border-radius:12px; border:1px solid #fde68a;">
+                    <div style="width:300px; padding:20px; background:var(--primary-50); border-radius:12px; border:1px solid var(--primary-200);">
                         <div style="display:flex; justify-content:space-between; margin-bottom:10px;"><span>Total Qty:</span><strong>${totalQty} Btl</strong></div>
                         <div style="display:flex; justify-content:space-between; margin-bottom:10px; color:#15803d;"><span>Profit Mitra:</span><strong>+${formatIDR(totalProfit)}</strong></div>
-                        <div style="display:flex; justify-content:space-between; border-top:1px dashed #d97706; padding-top:10px; font-size:18px; color:#92400e; font-weight:bold;"><span>TOTAL:</span><span>${formatIDR(totalTagihan)}</span></div>
+                        <div style="display:flex; justify-content:space-between; border-top:1px dashed var(--primary-600); padding-top:10px; font-size:18px; color:var(--primary-800); font-weight:bold;"><span>TOTAL:</span><span>${formatIDR(totalTagihan)}</span></div>
                     </div>
                 </div>
             </div>`;
@@ -462,12 +567,12 @@
             
             // Update Active Nav Styles
             document.querySelectorAll('.nav-btn').forEach(btn => {
-                btn.classList.remove('bg-slate-100', 'text-slate-900', 'shadow-sm', 'text-amber-600');
+                btn.classList.remove('bg-slate-100', 'text-slate-900', 'shadow-sm', 'text-primary-600');
                 if(btn.id.includes('mobile')) {
-                    btn.classList.remove('text-amber-600');
+                    btn.classList.remove('text-primary-600');
                     btn.classList.add('text-slate-400');
                 } else {
-                    btn.classList.remove('bg-slate-50', 'text-amber-600', 'font-bold');
+                    btn.classList.remove('bg-primary-50', 'text-primary-700', 'font-bold');
                     btn.classList.add('text-slate-500', 'font-semibold');
                 }
             });
@@ -475,12 +580,12 @@
             const activeDesktop = document.getElementById(`nav-desktop-${state.activeTab}`);
             if(activeDesktop) {
                 activeDesktop.classList.remove('text-slate-500');
-                activeDesktop.classList.add('bg-amber-50', 'text-amber-700', 'font-bold');
+                activeDesktop.classList.add('bg-primary-50', 'text-primary-700', 'font-bold');
             }
             const activeMobile = document.getElementById(`nav-mobile-${state.activeTab}`);
             if(activeMobile) {
                 activeMobile.classList.remove('text-slate-400');
-                activeMobile.classList.add('text-amber-600');
+                activeMobile.classList.add('text-primary-600');
             }
 
             if (state.activeTab === 'dashboard') renderDashboard(content);
@@ -523,7 +628,7 @@
                             <h3 class="text-lg md:text-xl font-black text-slate-800"><span class="text-blue-600">${bepDisplay}</span> <span class="text-xs font-semibold text-slate-400">btl</span></h3>
                         </div>
                         <div class="bg-slate-900 p-5 rounded-2xl shadow-md text-white">
-                            <div class="w-8 h-8 rounded-full bg-slate-800 text-amber-400 flex items-center justify-center mb-3"><i data-lucide="target" class="w-4 h-4"></i></div>
+                            <div class="w-8 h-8 rounded-full bg-slate-800 text-primary-400 flex items-center justify-center mb-3"><i data-lucide="target" class="w-4 h-4"></i></div>
                             <p class="text-slate-300 text-[10px] font-bold uppercase tracking-wider mb-1">Target Produksi</p>
                             <h3 class="text-lg md:text-xl font-black">${state.targetQty} <span class="text-xs font-semibold text-slate-400">btl</span></h3>
                         </div>
@@ -531,7 +636,7 @@
 
                     <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)]">
                         <div class="flex items-center gap-3 mb-6">
-                            <div class="p-2 bg-amber-50 rounded-xl"><i data-lucide="box" class="text-amber-600 w-5 h-5"></i></div>
+                            <div class="p-2 bg-primary-50 rounded-xl"><i data-lucide="box" class="text-primary-600 w-5 h-5"></i></div>
                             <div>
                                 <h3 class="font-heading font-bold text-slate-800">Status Stok & HPP Varian</h3>
                                 <p class="text-xs text-slate-500">Estimasi total HPP (Bahan + Overhead + Penyusutan)</p>
@@ -597,19 +702,19 @@
                         <div class="lg:col-span-7 flex flex-col gap-6">
                             <!-- GRID PRODUK -->
                             <div>
-                                <h3 class="font-heading font-bold text-slate-800 mb-3 text-sm flex items-center gap-2"><i data-lucide="layout-grid" class="w-4 h-4 text-amber-500"></i> Menu Cepat</h3>
+                                <h3 class="font-heading font-bold text-slate-800 mb-3 text-sm flex items-center gap-2"><i data-lucide="layout-grid" class="w-4 h-4 text-primary-500"></i> Menu Cepat</h3>
                                 <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                     ${state.variants.map(v => {
                                         const m = calculateVariantMetrics(v);
                                         const noStock = m.maxCanProduce <= 0;
                                         return `
-                                            <button onclick="addSale(${v.id})" ${noStock ? 'disabled' : ''} class="relative bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col items-center justify-center text-center transition-all ${noStock ? 'opacity-50 grayscale cursor-not-allowed' : 'hover:border-amber-400 hover:shadow-md active:scale-95'} group overflow-hidden">
-                                                <div class="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center mb-3 group-hover:bg-amber-50 group-hover:text-amber-600 transition-colors">
+                                            <button onclick="addSale(${v.id})" ${noStock ? 'disabled' : ''} class="relative bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col items-center justify-center text-center transition-all ${noStock ? 'opacity-50 grayscale cursor-not-allowed' : 'hover:border-primary-400 hover:shadow-md active:scale-95'} group overflow-hidden">
+                                                <div class="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center mb-3 group-hover:bg-primary-50 group-hover:text-primary-600 transition-colors">
                                                     <i data-lucide="coffee" class="w-5 h-5"></i>
                                                 </div>
                                                 <h4 class="font-bold text-slate-800 text-xs leading-tight mb-1">${v.name}</h4>
                                                 <p class="text-[10px] text-slate-400 mb-2">${v.bottleSize || '250 ml'}</p>
-                                                <p class="font-black text-amber-700 text-sm mt-auto">${formatIDR(v.price)}</p>
+                                                <p class="font-black text-primary-700 text-sm mt-auto">${formatIDR(v.price)}</p>
                                                 <div class="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[8px] font-bold ${noStock ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-500'}">Sisa: ${m.maxCanProduce}</div>
                                             </button>
                                         `;
@@ -621,18 +726,18 @@
                             <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm mt-auto">
                                 <details class="group cursor-pointer marker:content-['']">
                                     <summary class="flex justify-between items-center font-heading font-bold text-sm text-slate-800 select-none">
-                                        <div class="flex items-center gap-2"><i data-lucide="layers" class="w-4 h-4 text-amber-500"></i> Input Borongan (Rekap Masal)</div>
+                                        <div class="flex items-center gap-2"><i data-lucide="layers" class="w-4 h-4 text-primary-500"></i> Input Borongan (Rekap Masal)</div>
                                         <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 transition duration-300 group-open:-rotate-180"></i>
                                     </summary>
                                     <div class="pt-4 mt-4 border-t border-slate-100 cursor-default">
                                         <div class="grid grid-cols-2 gap-3 mb-4">
                                             <div>
                                                 <label class="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Tanggal</label>
-                                                <input type="date" id="bulk-date" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-amber-400" value="${todayISOString}">
+                                                <input type="date" id="bulk-date" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-primary-400" value="${todayISOString}">
                                             </div>
                                             <div>
                                                 <label class="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Pembayaran</label>
-                                                <select id="bulk-payment" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-amber-400">
+                                                <select id="bulk-payment" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-primary-400">
                                                     <option value="CASH">Tunai (CASH)</option>
                                                     <option value="QRIS">QRIS / Transfer</option>
                                                 </select>
@@ -747,9 +852,9 @@
                             <h4 class="text-xl font-black text-slate-800">${totals.qty}</h4>
                         </div>
                         <div class="bg-slate-900 p-4 rounded-2xl shadow-md text-white relative overflow-hidden">
-                            <div class="absolute right-0 top-0 w-8 h-full bg-amber-500/10 skew-x-12 transform translate-x-4"></div>
+                            <div class="absolute right-0 top-0 w-8 h-full bg-primary-500/10 skew-x-12 transform translate-x-4"></div>
                             <p class="text-slate-300 text-[9px] font-bold uppercase tracking-wider mb-1" title="Pendapatan Aktual yang masuk setelah dipotong hak reseller">Total Omzet</p>
-                            <h4 class="text-xl font-black text-amber-400">${formatIDR(totals.bersih)}</h4>
+                            <h4 class="text-xl font-black text-primary-400">${formatIDR(totals.bersih)}</h4>
                             <div class="flex gap-3 mt-2 pt-2 border-t border-slate-700">
                                 <div><span class="text-[8px] text-slate-400">CASH:</span> <span class="text-[10px] font-bold">${formatIDR(totals.cash)}</span></div>
                                 <div><span class="text-[8px] text-slate-400">QRIS:</span> <span class="text-[10px] font-bold">${formatIDR(totals.qris)}</span></div>
@@ -837,9 +942,9 @@
                             <p class="text-xs text-slate-500 mt-0.5">Dikalkulasi otomatis termasuk Overhead & Penyusutan.</p>
                         </div>
                         <div class="bg-slate-100 p-1 rounded-xl flex">
-                            <button onclick="state.reportFilter='daily'; render();" class="px-4 py-1.5 rounded-lg text-xs font-bold ${state.reportFilter==='daily'?'bg-white shadow-sm text-amber-600':'text-slate-500'}">Harian</button>
-                            <button onclick="state.reportFilter='weekly'; render();" class="px-4 py-1.5 rounded-lg text-xs font-bold ${state.reportFilter==='weekly'?'bg-white shadow-sm text-amber-600':'text-slate-500'}">Mingguan</button>
-                            <button onclick="state.reportFilter='monthly'; render();" class="px-4 py-1.5 rounded-lg text-xs font-bold ${state.reportFilter==='monthly'?'bg-white shadow-sm text-amber-600':'text-slate-500'}">Bulanan</button>
+                            <button onclick="state.reportFilter='daily'; render();" class="px-4 py-1.5 rounded-lg text-xs font-bold ${state.reportFilter==='daily'?'bg-white shadow-sm text-primary-600':'text-slate-500'}">Harian</button>
+                            <button onclick="state.reportFilter='weekly'; render();" class="px-4 py-1.5 rounded-lg text-xs font-bold ${state.reportFilter==='weekly'?'bg-white shadow-sm text-primary-600':'text-slate-500'}">Mingguan</button>
+                            <button onclick="state.reportFilter='monthly'; render();" class="px-4 py-1.5 rounded-lg text-xs font-bold ${state.reportFilter==='monthly'?'bg-white shadow-sm text-primary-600':'text-slate-500'}">Bulanan</button>
                         </div>
                     </div>
 
@@ -854,7 +959,7 @@
                             <p class="text-[9px] text-slate-400 font-bold uppercase mb-1">Overhead Pro-rata</p><h4 class="text-sm font-black text-red-400">${formatIDR(allocOverhead)}</h4>
                         </div>
                         <div class="bg-white p-4 rounded-2xl border border-slate-200">
-                            <p class="text-[9px] text-slate-400 font-bold uppercase mb-1">Penyusutan</p><h4 class="text-sm font-black text-amber-500">${formatIDR(allocDepreciation)}</h4>
+                            <p class="text-[9px] text-slate-400 font-bold uppercase mb-1">Penyusutan</p><h4 class="text-sm font-black text-primary-500">${formatIDR(allocDepreciation)}</h4>
                         </div>
                         <div class="col-span-2 md:col-span-1 p-4 rounded-2xl border ${netProfit >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}">
                             <p class="text-[9px] font-bold uppercase mb-1 ${netProfit >= 0 ? 'text-emerald-600' : 'text-red-500'}">Laba Bersih Final</p>
@@ -868,7 +973,7 @@
                                 <p class="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">Progress BEP Periode Ini</p>
                                 <h4 class="text-lg font-black text-slate-800">${totalUnits} <span class="text-sm text-slate-400">/ ${bepTarget} Btl</span></h4>
                             </div>
-                            <span class="text-[10px] font-bold px-2.5 py-1 rounded-md ${isBep ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">${isBep ? 'Tercapai' : 'Belum BEP'}</span>
+                            <span class="text-[10px] font-bold px-2.5 py-1 rounded-md ${isBep ? 'bg-emerald-100 text-emerald-700' : 'bg-primary-100 text-primary-700'}">${isBep ? 'Tercapai' : 'Belum BEP'}</span>
                         </div>
                         <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
                             <div class="h-full rounded-full transition-all duration-700 ${isBep ? 'bg-emerald-500' : 'bg-blue-500'}" style="width: ${Math.min((totalUnits / (bepTarget || 1)) * 100, 100)}%"></div>
@@ -890,15 +995,15 @@
                     </div>
 
                     <!-- PRINT SECTION COMPACT -->
-                    <div class="bg-amber-50 p-4 rounded-2xl border border-amber-200 flex flex-col sm:flex-row gap-3 justify-between items-center">
+                    <div class="bg-primary-50 p-4 rounded-2xl border border-primary-200 flex flex-col sm:flex-row gap-3 justify-between items-center">
                         <div class="flex items-center gap-3 w-full sm:w-auto">
-                            <div class="w-8 h-8 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center shrink-0"><i data-lucide="printer" class="w-4 h-4"></i></div>
-                            <select id="report-reseller-select" class="flex-1 sm:w-48 bg-white border border-amber-200 rounded-lg px-3 py-1.5 text-xs font-bold outline-none text-slate-700" onchange="state.selectedReportReseller = this.value; render();">
+                            <div class="w-8 h-8 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center shrink-0"><i data-lucide="printer" class="w-4 h-4"></i></div>
+                            <select id="report-reseller-select" class="flex-1 sm:w-48 bg-white border border-primary-200 rounded-lg px-3 py-1.5 text-xs font-bold outline-none text-slate-700" onchange="state.selectedReportReseller = this.value; render();">
                                 <option value="all" ${state.selectedReportReseller === 'all' ? 'selected' : ''}>Pilih Reseller...</option>
                                 ${state.resellers.map(r => `<option value="${r.id}" ${state.selectedReportReseller == r.id ? 'selected' : ''}>${r.name}</option>`).join('')}
                             </select>
                         </div>
-                        <button onclick="printResellerReport()" class="w-full sm:w-auto bg-amber-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-amber-700 transition-colors">Cetak Invoice</button>
+                        <button onclick="printResellerReport()" class="w-full sm:w-auto bg-primary-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-primary-700 transition-colors">Cetak Invoice</button>
                     </div>
 
                     <!-- RESELLER GRID -->
@@ -912,9 +1017,9 @@
                                         <label class="text-[8px] font-bold text-slate-400 uppercase">Kontak</label>
                                         <input class="w-full bg-transparent text-xs font-semibold outline-none mt-0.5" value="${r.phone || ''}" onchange="updateReseller(${r.id}, 'phone', this.value)" placeholder="08...">
                                     </div>
-                                    <div class="bg-amber-50 p-2 rounded-lg border border-amber-100">
-                                        <label class="text-[8px] font-bold text-amber-600 uppercase">Diskon (%)</label>
-                                        <input class="w-full bg-transparent text-xs font-black text-amber-800 outline-none mt-0.5" type="number" value="${r.discountRate}" onchange="updateReseller(${r.id}, 'discountRate', parseFloat(this.value))">
+                                    <div class="bg-primary-50 p-2 rounded-lg border border-primary-100">
+                                        <label class="text-[8px] font-bold text-primary-600 uppercase">Diskon (%)</label>
+                                        <input class="w-full bg-transparent text-xs font-black text-primary-800 outline-none mt-0.5" type="number" value="${r.discountRate}" onchange="updateReseller(${r.id}, 'discountRate', parseFloat(this.value))">
                                     </div>
                                 </div>
                             </div>
@@ -929,8 +1034,37 @@
             
             el.innerHTML = `
                 <div class="space-y-6 animate-fade-in">
-                    <h2 class="text-xl font-heading font-extrabold text-slate-800">Master Data</h2>
+                    <h2 class="text-xl font-heading font-extrabold text-slate-800">Pengaturan</h2>
                     
+                    <!-- TEMA & LOGO -->
+                    <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex flex-col lg:flex-row gap-6 mb-6">
+                        <div class="flex-1 border-b lg:border-b-0 lg:border-r border-slate-100 pb-5 lg:pb-0 lg:pr-6">
+                            <h3 class="font-bold text-sm flex items-center gap-2 mb-3 text-slate-700"><i data-lucide="palette" class="w-4 h-4 text-primary-500"></i> Tema Warna</h3>
+                            <div class="flex flex-wrap gap-3">
+                                <button onclick="changeTheme('amber')" class="w-8 h-8 rounded-full bg-[#f59e0b] border-2 ${state.theme==='amber'?'border-slate-800 ring-2 ring-slate-200':'border-transparent'} transition-all"></button>
+                                <button onclick="changeTheme('emerald')" class="w-8 h-8 rounded-full bg-[#10b981] border-2 ${state.theme==='emerald'?'border-slate-800 ring-2 ring-slate-200':'border-transparent'} transition-all"></button>
+                                <button onclick="changeTheme('blue')" class="w-8 h-8 rounded-full bg-[#3b82f6] border-2 ${state.theme==='blue'?'border-slate-800 ring-2 ring-slate-200':'border-transparent'} transition-all"></button>
+                                <button onclick="changeTheme('rose')" class="w-8 h-8 rounded-full bg-[#f43f5e] border-2 ${state.theme==='rose'?'border-slate-800 ring-2 ring-slate-200':'border-transparent'} transition-all"></button>
+                                <button onclick="changeTheme('slate')" class="w-8 h-8 rounded-full bg-[#64748b] border-2 ${state.theme==='slate'?'border-slate-800 ring-2 ring-slate-200':'border-transparent'} transition-all"></button>
+                            </div>
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="font-bold text-sm flex items-center gap-2 mb-3 text-slate-700"><i data-lucide="image" class="w-4 h-4 text-primary-500"></i> Logo Aplikasi</h3>
+                            <div class="flex items-center gap-4">
+                                <div class="w-14 h-14 bg-slate-50 rounded-xl flex items-center justify-center border border-slate-200 overflow-hidden shrink-0">
+                                    ${state.logoUrl ? `<img src="${state.logoUrl}" class="w-full h-full object-cover">` : `<i data-lucide="coffee" class="w-6 h-6 text-slate-400"></i>`}
+                                </div>
+                                <div class="flex flex-col gap-2 items-start">
+                                    <label class="bg-primary-50 text-primary-700 border border-primary-200 px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer hover:bg-primary-100 transition-colors">
+                                        Upload Gambar
+                                        <input type="file" accept="image/*" class="hidden" onchange="handleLogoUpload(event)">
+                                    </label>
+                                    ${state.logoUrl ? `<button onclick="resetLogo()" class="text-[10px] text-red-500 font-bold hover:underline">Hapus Logo</button>` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- MASTER TABS/CARDS COMPACT -->
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         
@@ -989,8 +1123,8 @@
                         <!-- VARIAN RESEP -->
                         <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex flex-col">
                             <div class="flex justify-between items-center mb-4">
-                                <h3 class="font-bold text-sm flex items-center gap-2"><i data-lucide="coffee" class="w-4 h-4 text-amber-600"></i> Resep Varian</h3>
-                                <button onclick="addVariant()" class="text-[10px] bg-amber-50 px-2 py-1 rounded font-bold text-amber-700 hover:bg-amber-100">+ Tambah Varian</button>
+                                <h3 class="font-bold text-sm flex items-center gap-2"><i data-lucide="coffee" class="w-4 h-4 text-primary-600"></i> Resep Varian</h3>
+                                <button onclick="addVariant()" class="text-[10px] bg-primary-50 px-2 py-1 rounded font-bold text-primary-700 hover:bg-primary-100">+ Tambah Varian</button>
                             </div>
                             
                             <div class="flex gap-2 mb-4 overflow-x-auto thin-scrollbar pb-2">
@@ -1004,7 +1138,7 @@
                                     <div class="flex justify-between items-start mb-3">
                                         <div class="grid grid-cols-2 gap-2 w-full pr-4">
                                             <input class="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold outline-none" value="${currentVariant.name}" onchange="updateVar(${currentVariant.id}, 'name', this.value)">
-                                            <input type="number" class="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold text-amber-600 outline-none" value="${currentVariant.price}" placeholder="Harga" onchange="updateVar(${currentVariant.id}, 'price', parseInt(this.value))">
+                                            <input type="number" class="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold text-primary-600 outline-none" value="${currentVariant.price}" placeholder="Harga" onchange="updateVar(${currentVariant.id}, 'price', parseInt(this.value))">
                                             <select class="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold outline-none col-span-2" onchange="updateVar(${currentVariant.id}, 'bottleSize', this.value)">
                                                 <option value="250 ml" ${currentVariant.bottleSize==='250 ml'?'selected':''}>Botol 250 ml</option>
                                                 <option value="500 ml" ${currentVariant.bottleSize==='500 ml'?'selected':''}>Botol 500 ml</option>
@@ -1048,7 +1182,7 @@
             `;
         }
 
-        // --- SISTEM RESET & CRUD (Tetap sama persis dengan versi sebelumnya) ---
+        // --- SISTEM RESET & CRUD ---
         window.promptReset = (type) => {
             let targetName = type === 'sales' ? "Riwayat Penjualan" : "Seluruh Data Aplikasi";
             showModal('confirm', 'Hapus ' + targetName + '?', 'Tindakan ini permanen. Lanjutkan?', () => executeReset(type));
@@ -1117,7 +1251,8 @@
             }
         });
 
-        lucide.createIcons();
+        // Initialize App UI settings on load
+        initThemeAndLogo();
     </script>
 </body>
 </html>
