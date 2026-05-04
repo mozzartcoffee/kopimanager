@@ -14,13 +14,16 @@
         
         body { 
             font-family: 'Inter', sans-serif; 
-            background-color: #f8fafc; /* Slate 50 modern */
-            color: #1e293b; /* Slate 800 */
+            background-color: #f8fafc; 
+            color: #1e293b; 
         }
         h1, h2, h3, h4, h5, .font-heading { font-family: 'Plus Jakarta Sans', sans-serif; }
         
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        /* Scrollbar custom tipis dan modern untuk mengganti no-scrollbar */
+        .thin-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .thin-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .thin-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
+        .thin-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #94a3b8; }
         
         .animate-fade-in { animation: fadeIn 0.25s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
@@ -75,7 +78,7 @@
                     <i data-lucide="coffee" class="text-amber-600 w-6 h-6"></i> KopiManager
                 </h1>
             </div>
-            <nav class="flex-1 px-4 py-2 space-y-1 overflow-y-auto">
+            <nav class="flex-1 px-4 py-2 space-y-1 overflow-y-auto thin-scrollbar">
                 <p class="px-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 mt-4">Menu Utama</p>
                 <button onclick="switchTab('dashboard')" id="nav-desktop-dashboard" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all text-slate-500 hover:bg-slate-50"><i data-lucide="layout-dashboard" class="w-4 h-4"></i> Dasbor</button>
                 <button onclick="switchTab('transaksi')" id="nav-desktop-transaksi" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all text-slate-500 hover:bg-slate-50"><i data-lucide="shopping-bag" class="w-4 h-4"></i> Kasir & Jual</button>
@@ -102,7 +105,7 @@
             </header>
 
             <!-- SCROLLABLE TAB CONTENT -->
-            <div class="flex-1 overflow-y-auto p-4 md:p-8 pb-24 md:pb-8">
+            <div class="flex-1 overflow-y-auto thin-scrollbar p-4 md:p-8 pb-24 md:pb-8">
                 <div id="tab-content" class="max-w-5xl mx-auto w-full"></div>
             </div>
 
@@ -134,7 +137,7 @@
         // --- APP STATE ---
         let state = {
             isLoggedIn: false,
-            activeTab: 'transaksi', // Default ke transaksi (paling sering dipakai)
+            activeTab: 'transaksi', 
             reportFilter: 'daily',
             rekapDate: new Date().toISOString().split('T')[0],
             editingVariantId: null,
@@ -351,7 +354,7 @@
             }
         };
 
-        // --- PRINT RESELLER --- (Intact from original)
+        // --- PRINT RESELLER ---
         window.printResellerReport = () => {
             if(state.selectedReportReseller === 'all') return showModal('alert', 'Perhatian', 'Pilih Reseller spesifik.');
             const r = state.resellers.find(x => x.id === parseInt(state.selectedReportReseller));
@@ -565,7 +568,7 @@
 
         function renderTransaksi(el) {
             const todayISOString = new Date().toISOString().split('T')[0];
-            const groupedSales = getGroupedSales(state.sales.slice(0, 50)); // Limit show recent 50 for performance UI
+            const groupedSales = getGroupedSales(state.sales.slice(0, 50)); 
 
             el.innerHTML = `
                 <div class="h-full flex flex-col gap-6 animate-fade-in">
@@ -635,7 +638,7 @@
                                                 </select>
                                             </div>
                                         </div>
-                                        <div class="space-y-2 mb-4 max-h-40 overflow-y-auto pr-2 no-scrollbar">
+                                        <div class="space-y-2 mb-4 max-h-[200px] overflow-y-auto pr-2 thin-scrollbar">
                                             ${state.variants.map(v => `
                                                 <div class="flex justify-between items-center bg-slate-50 p-2 rounded-xl">
                                                     <div class="flex flex-col pr-2">
@@ -662,7 +665,7 @@
                                 <h3 class="font-heading font-bold text-sm flex items-center gap-2"><i data-lucide="history" class="w-4 h-4 text-slate-400"></i> Transaksi Terkini</h3>
                                 <button onclick="promptReset('sales')" class="text-[10px] px-2 py-1 bg-red-50 text-red-500 rounded font-bold hover:bg-red-100 transition-colors">Reset</button>
                             </div>
-                            <div class="flex-1 overflow-y-auto p-2 space-y-1">
+                            <div class="flex-1 overflow-y-auto p-2 space-y-1 thin-scrollbar">
                                 ${groupedSales.length === 0 ? '<div class="h-full flex flex-col items-center justify-center text-slate-300"><i data-lucide="receipt" class="w-10 h-10 mb-2 opacity-50"></i><p class="text-xs font-medium">Belum ada transaksi</p></div>' : 
                                     groupedSales.map(s => {
                                     const isReseller = s.resellerId != null;
@@ -713,9 +716,9 @@
                 const pMethod = parts[2] || 'CASH';
                 const key = `${vName}_${vSize}_${pMethod}`;
                 const qty = s.qty || 1;
-                const gross = s.price * qty;
-                const net = (s.price - (s.resellerProfit || 0)) * qty;
-                const cost = s.recordedIngredientCost * qty;
+                const gross = s.price * qty; // Nilai kotor sebelum dipotong persentase diskon reseller
+                const net = (s.price - (s.resellerProfit || 0)) * qty; // Omzet pendapatan murni masuk kas
+                const cost = s.recordedIngredientCost * qty; // HPP (Modal Bahan Baku)
 
                 if(!summary[key]) summary[key] = { name: vName, size: vSize, method: pMethod, qty: 0, gross: 0, net: 0, cost: 0 };
                 summary[key].qty += qty; summary[key].gross += gross; summary[key].net += net; summary[key].cost += cost;
@@ -730,7 +733,7 @@
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                         <div>
                             <h2 class="text-xl font-heading font-extrabold text-slate-800">Rekap Penjualan Harian</h2>
-                            <p class="text-xs text-slate-500 mt-0.5">Pantau rincian barang keluar di hari tertentu.</p>
+                            <p class="text-xs text-slate-500 mt-0.5">Pantau ringkasan omzet dan laba di hari tertentu.</p>
                         </div>
                         <div class="bg-white p-2 rounded-xl border border-slate-200 shadow-sm flex items-center gap-2 w-full sm:w-auto">
                             <i data-lucide="calendar" class="w-4 h-4 text-slate-400 ml-1"></i>
@@ -743,13 +746,9 @@
                             <p class="text-slate-400 text-[9px] font-bold uppercase tracking-wider mb-1">Botol Terjual</p>
                             <h4 class="text-xl font-black text-slate-800">${totals.qty}</h4>
                         </div>
-                        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-                            <p class="text-slate-400 text-[9px] font-bold uppercase tracking-wider mb-1">Omzet Kotor</p>
-                            <h4 class="text-xl font-black text-slate-600">${formatIDR(totals.kotor)}</h4>
-                        </div>
                         <div class="bg-slate-900 p-4 rounded-2xl shadow-md text-white relative overflow-hidden">
                             <div class="absolute right-0 top-0 w-8 h-full bg-amber-500/10 skew-x-12 transform translate-x-4"></div>
-                            <p class="text-slate-300 text-[9px] font-bold uppercase tracking-wider mb-1">Omzet Bersih</p>
+                            <p class="text-slate-300 text-[9px] font-bold uppercase tracking-wider mb-1" title="Pendapatan Aktual yang masuk setelah dipotong hak reseller">Total Omzet</p>
                             <h4 class="text-xl font-black text-amber-400">${formatIDR(totals.bersih)}</h4>
                             <div class="flex gap-3 mt-2 pt-2 border-t border-slate-700">
                                 <div><span class="text-[8px] text-slate-400">CASH:</span> <span class="text-[10px] font-bold">${formatIDR(totals.cash)}</span></div>
@@ -757,25 +756,30 @@
                             </div>
                         </div>
                         <div class="bg-red-50 p-4 rounded-2xl border border-red-100">
-                            <p class="text-red-400 text-[9px] font-bold uppercase tracking-wider mb-1">Modal (HPP)</p>
+                            <p class="text-red-400 text-[9px] font-bold uppercase tracking-wider mb-1">Modal (Bahan Baku)</p>
                             <h4 class="text-xl font-black text-red-600">${formatIDR(totals.modal)}</h4>
+                        </div>
+                        <div class="bg-emerald-50 p-4 rounded-2xl border border-emerald-100">
+                            <p class="text-emerald-600 text-[9px] font-bold uppercase tracking-wider mb-1" title="Total Omzet dikurangi Modal Bahan Baku">Laba Kotor</p>
+                            <h4 class="text-xl font-black text-emerald-700">${formatIDR(totals.bersih - totals.modal)}</h4>
                         </div>
                     </div>
 
                     <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-                        <div class="overflow-x-auto no-scrollbar">
+                        <div class="overflow-x-auto thin-scrollbar">
                             <table class="w-full text-left text-sm whitespace-nowrap">
                                 <thead class="bg-slate-50 border-b border-slate-100 text-[10px] font-bold uppercase text-slate-500">
                                     <tr>
                                         <th class="px-5 py-3">Produk</th>
                                         <th class="px-5 py-3 text-center">Metode</th>
                                         <th class="px-5 py-3 text-center">Qty</th>
-                                        <th class="px-5 py-3 text-right">Omzet Bersih</th>
-                                        <th class="px-5 py-3 text-right">Laba (Kotor)</th>
+                                        <th class="px-5 py-3 text-right">Harga Jual Normal</th>
+                                        <th class="px-5 py-3 text-right">Omzet Masuk (Aktual)</th>
+                                        <th class="px-5 py-3 text-right">Laba Kotor</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-50">
-                                    ${summaryArray.length === 0 ? '<tr><td colspan="5" class="px-5 py-8 text-center text-slate-400 text-xs">Tidak ada data untuk tanggal ini.</td></tr>' : 
+                                    ${summaryArray.length === 0 ? '<tr><td colspan="6" class="px-5 py-8 text-center text-slate-400 text-xs">Tidak ada data untuk tanggal ini.</td></tr>' : 
                                         summaryArray.map(item => {
                                             const laba = item.net - item.cost;
                                             return `
@@ -786,7 +790,8 @@
                                                 </td>
                                                 <td class="px-5 py-3 text-center"><span class="text-[8px] font-bold px-2 py-0.5 rounded border ${item.method==='QRIS'?'bg-blue-50 text-blue-500 border-blue-100':'bg-emerald-50 text-emerald-500 border-emerald-100'}">${item.method}</span></td>
                                                 <td class="px-5 py-3 text-center font-black text-slate-700">${item.qty}</td>
-                                                <td class="px-5 py-3 text-right font-bold text-slate-700">${formatIDR(item.net)}</td>
+                                                <td class="px-5 py-3 text-right font-bold text-slate-400 line-through">${formatIDR(item.gross)}</td>
+                                                <td class="px-5 py-3 text-right font-bold text-slate-800">${formatIDR(item.net)}</td>
                                                 <td class="px-5 py-3 text-right font-black ${laba>=0?'text-emerald-600':'text-red-500'}">${formatIDR(laba)}</td>
                                             </tr>
                                         `}).join('')
@@ -935,9 +940,9 @@
                             <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
                                 <div class="flex justify-between items-center mb-4">
                                     <h3 class="font-bold text-sm flex items-center gap-2"><i data-lucide="package" class="w-4 h-4 text-emerald-500"></i> Gudang Bahan</h3>
-                                    <button onclick="addIngredient()" class="text-[10px] bg-slate-100 px-2 py-1 rounded font-bold text-slate-600">+ Bahan</button>
+                                    <button onclick="addIngredient()" class="text-[10px] bg-slate-100 px-2 py-1 rounded font-bold text-slate-600 hover:bg-slate-200">+ Tambah Bahan</button>
                                 </div>
-                                <div class="space-y-2 max-h-48 overflow-y-auto pr-1 no-scrollbar">
+                                <div class="space-y-2 max-h-[300px] overflow-y-auto pr-2 thin-scrollbar">
                                     ${state.ingredients.map(ing => `
                                         <div class="flex gap-2 items-center bg-slate-50 p-2 rounded-xl">
                                             <input class="w-1/3 bg-transparent text-xs font-bold outline-none" value="${ing.name}" onchange="updateIng(${ing.id}, 'name', this.value)">
@@ -964,7 +969,7 @@
                                             <input type="number" class="w-1/2 bg-slate-50 border border-slate-100 rounded px-1.5 py-1 text-[9px] outline-none" value="${ops.monthly}" onchange="updateOpsCost(${ops.id}, 'monthly', parseFloat(this.value))">
                                         </div>
                                     `).join('')}
-                                    <button onclick="addOps()" class="text-[9px] text-blue-500 font-bold mt-1">+ Tambah</button>
+                                    <button onclick="addOps()" class="text-[9px] text-blue-500 font-bold mt-1 hover:underline">+ Tambah</button>
                                 </div>
                                 <div class="w-px bg-slate-100"></div>
                                 <div class="flex-1">
@@ -976,7 +981,7 @@
                                             <input type="number" class="w-1/4 bg-slate-50 border border-slate-100 rounded px-1 text-[9px] outline-none" value="${a.lifeYears}" title="Tahun" onchange="updateAsset(${a.id}, 'lifeYears', parseFloat(this.value))">
                                         </div>
                                     `).join('')}
-                                    <button onclick="addAsset()" class="text-[9px] text-blue-500 font-bold mt-1">+ Tambah</button>
+                                    <button onclick="addAsset()" class="text-[9px] text-blue-500 font-bold mt-1 hover:underline">+ Tambah</button>
                                 </div>
                             </div>
                         </div>
@@ -985,10 +990,10 @@
                         <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex flex-col">
                             <div class="flex justify-between items-center mb-4">
                                 <h3 class="font-bold text-sm flex items-center gap-2"><i data-lucide="coffee" class="w-4 h-4 text-amber-600"></i> Resep Varian</h3>
-                                <button onclick="addVariant()" class="text-[10px] bg-amber-50 px-2 py-1 rounded font-bold text-amber-700">+ Varian</button>
+                                <button onclick="addVariant()" class="text-[10px] bg-amber-50 px-2 py-1 rounded font-bold text-amber-700 hover:bg-amber-100">+ Tambah Varian</button>
                             </div>
                             
-                            <div class="flex gap-2 mb-4 overflow-x-auto no-scrollbar pb-2">
+                            <div class="flex gap-2 mb-4 overflow-x-auto thin-scrollbar pb-2">
                                 ${state.variants.map(v => `
                                     <button onclick="state.editingVariantId=${v.id}; render();" class="shrink-0 px-3 py-1.5 rounded-lg border text-xs font-bold transition-colors whitespace-nowrap ${state.editingVariantId===v.id?'bg-slate-800 text-white border-slate-800':'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}">${v.name}</button>
                                 `).join('')}
@@ -1006,10 +1011,10 @@
                                                 <option value="1 Liter" ${currentVariant.bottleSize==='1 Liter'?'selected':''}>Botol 1 Liter</option>
                                             </select>
                                         </div>
-                                        <button onclick="if(confirm('Hapus?')){ delVariant(${currentVariant.id}); }" class="text-slate-400 hover:text-red-500"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                        <button onclick="if(confirm('Hapus Varian Ini?')){ delVariant(${currentVariant.id}); }" class="text-slate-400 hover:text-red-500"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                                     </div>
                                     <p class="text-[9px] font-bold text-slate-400 uppercase mb-2">Komposisi (Takaran)</p>
-                                    <div class="space-y-1.5 max-h-32 overflow-y-auto pr-1 no-scrollbar">
+                                    <div class="space-y-1.5 max-h-[250px] overflow-y-auto pr-2 thin-scrollbar">
                                         ${state.ingredients.map(ing => {
                                             const rec = currentVariant.recipe.find(r => r.ingId === ing.id);
                                             return `
@@ -1024,7 +1029,7 @@
                                         }).join('')}
                                     </div>
                                 </div>
-                            ` : `<div class="flex-1 border-2 border-dashed border-slate-200 rounded-2xl flex items-center justify-center text-slate-400 text-xs font-medium">Pilih varian di atas</div>`}
+                            ` : `<div class="flex-1 border-2 border-dashed border-slate-200 rounded-2xl flex items-center justify-center text-slate-400 text-xs font-medium min-h-[150px]">Pilih varian di atas</div>`}
                         </div>
                     </div>
 
@@ -1074,15 +1079,15 @@
         window.updateReseller = (id, f, v) => { supabaseClient.from('resellers').update({ [f]: v }).eq('id', id).then(); const r = state.resellers.find(x => x.id === id); if (r) r[f] = v; render(); };
         window.delReseller = (id) => { supabaseClient.from('resellers').delete().eq('id', id).then(); state.resellers = state.resellers.filter(x => x.id !== id); render(); };
 
-        window.addIngredient = () => { const newItem = { id: Date.now(), name: 'Bahan', cost: 0, bulkAmount: 100, unit: 'g' }; supabaseClient.from('ingredients').insert([newItem]).then(); state.ingredients.push(newItem); render(); };
+        window.addIngredient = () => { const newItem = { id: Date.now(), name: 'Bahan Baru', cost: 0, bulkAmount: 100, unit: 'g' }; supabaseClient.from('ingredients').insert([newItem]).then(); state.ingredients.push(newItem); render(); };
         window.updateIng = (id, f, v) => { supabaseClient.from('ingredients').update({ [f]: v }).eq('id', id).then(); const i = state.ingredients.find(x => x.id === id); if (i) i[f] = v; render(); };
         window.delIng = (id) => { supabaseClient.from('ingredients').delete().eq('id', id).then(); state.ingredients = state.ingredients.filter(x => x.id !== id); render(); };
         
-        window.addAsset = () => { const newItem = { id: Date.now(), name: 'Aset', cost: 0, lifeYears: 5 }; supabaseClient.from('assets').insert([newItem]).then(); state.assets.push(newItem); render(); };
+        window.addAsset = () => { const newItem = { id: Date.now(), name: 'Aset Baru', cost: 0, lifeYears: 5 }; supabaseClient.from('assets').insert([newItem]).then(); state.assets.push(newItem); render(); };
         window.updateAsset = (id, f, v) => { supabaseClient.from('assets').update({ [f]: v }).eq('id', id).then(); const a = state.assets.find(x => x.id === id); if (a) a[f] = v; render(); };
         window.delAsset = (id) => { supabaseClient.from('assets').delete().eq('id', id).then(); state.assets = state.assets.filter(x => x.id !== id); render(); };
 
-        window.addVariant = () => { const nid = Date.now(); const dbItem = { id: nid, name: 'Varian', price: 0, recipe: [{ ingId: 'SIZE', qty: '250 ml' }] }; supabaseClient.from('variants').insert([dbItem]).then(); state.variants.push({ id: nid, name: 'Varian', bottleSize: '250 ml', price: 0, recipe: [] }); state.editingVariantId = nid; render(); };
+        window.addVariant = () => { const nid = Date.now(); const dbItem = { id: nid, name: 'Varian Baru', price: 0, recipe: [{ ingId: 'SIZE', qty: '250 ml' }] }; supabaseClient.from('variants').insert([dbItem]).then(); state.variants.push({ id: nid, name: 'Varian Baru', bottleSize: '250 ml', price: 0, recipe: [] }); state.editingVariantId = nid; render(); };
         window.delVariant = (id) => { supabaseClient.from('variants').delete().eq('id', id).then(); state.variants = state.variants.filter(x => x.id !== id); state.editingVariantId = null; render(); };
         window.updateVar = (id, f, v) => { const x = state.variants.find(y => y.id === id); if (x) { x[f] = v; if (f === 'bottleSize') { const dbRecipe = [...x.recipe, { ingId: 'SIZE', qty: v }]; supabaseClient.from('variants').update({ recipe: dbRecipe }).eq('id', id).then(); } else { supabaseClient.from('variants').update({ [f]: v }).eq('id', id).then(); } } render(); };
         window.updateRecipe = (vid, iid, qty) => { const v = state.variants.find(x => x.id === vid); if (v) { const other = v.recipe.filter(r => r.ingId !== iid); const q = parseFloat(qty); const newRecipe = q > 0 ? [...other, { ingId: iid, qty: q }] : other; v.recipe = newRecipe; const dbRecipe = [...newRecipe, { ingId: 'SIZE', qty: v.bottleSize || '250 ml' }]; supabaseClient.from('variants').update({ recipe: dbRecipe }).eq('id', vid).then(); } render(); };
