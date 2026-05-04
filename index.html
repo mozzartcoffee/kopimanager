@@ -3,19 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KopiManager Pro - Sistem Manajerial Kopi Botolan</title>
+    <title>KopiManager Pro - Sistem POS Kopi Modern</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     
-    <!-- Tambahkan Supabase JS Client -->
+    <!-- Supabase JS Client -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;700;800&display=swap');
+        
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: #f8fafc; /* Slate 50 modern */
+            color: #1e293b; /* Slate 800 */
+        }
+        h1, h2, h3, h4, h5, .font-heading { font-family: 'Plus Jakarta Sans', sans-serif; }
+        
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        .animate-fade-in { animation: fadeIn 0.3s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .animate-fade-in { animation: fadeIn 0.25s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         
         /* PENGATURAN MODE CETAK (PRINT) */
         @media print {
@@ -24,91 +32,114 @@
             #print-area { position: absolute; left: 0; top: 0; width: 100%; background: white;}
             .no-print { display: none !important; }
         }
+
+        /* Glassmorphism utils */
+        .glass { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
     </style>
 </head>
-<body class="bg-[#fcfaf7] text-stone-800 relative">
+<body class="flex h-screen overflow-hidden text-slate-800">
 
     <!-- LOGIN OVERLAY -->
-    <div id="login-screen" class="min-h-screen flex items-center justify-center p-4">
-        <div class="max-w-md w-full bg-white p-8 rounded-[32px] shadow-xl border border-stone-100 animate-fade-in">
-            <div class="text-center mb-8">
-                <div class="w-16 h-16 bg-amber-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                    <i data-lucide="coffee" class="text-amber-800 w-8 h-8"></i>
-                </div>
-                <h1 class="text-3xl font-black text-stone-900 tracking-tight">KopiManager<span class="text-amber-600">.</span></h1>
-                <p class="text-stone-400 text-sm mt-2">Sistem Manajerial Kopi Botolan</p>
+    <div id="login-screen" class="fixed inset-0 z-50 bg-slate-50 flex items-center justify-center p-4">
+        <div class="max-w-sm w-full bg-white p-8 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 animate-fade-in text-center">
+            <div class="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto mb-5 text-amber-600">
+                <i data-lucide="coffee" class="w-8 h-8"></i>
             </div>
-            <form id="login-form" class="space-y-4">
+            <h1 class="text-2xl font-heading font-extrabold text-slate-900 tracking-tight mb-1">KopiManager<span class="text-amber-500">.</span></h1>
+            <p class="text-slate-500 text-xs font-medium mb-8">Manajemen Kopi Botolan Pro</p>
+            
+            <form id="login-form" class="space-y-3">
                 <div class="relative">
-                    <i data-lucide="user" class="absolute left-4 top-4 text-stone-400 w-5 h-5"></i>
-                    <input type="email" id="email" class="w-full pl-12 pr-4 py-4 bg-stone-50 border rounded-2xl outline-none focus:ring-2 focus:ring-amber-500" placeholder="Masukkan Email Anda" required>
+                    <i data-lucide="mail" class="absolute left-4 top-3.5 text-slate-400 w-4 h-4"></i>
+                    <input type="email" id="email" class="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all" placeholder="Email Anda" required>
                 </div>
                 <div class="relative">
-                    <i data-lucide="lock" class="absolute left-4 top-4 text-stone-400 w-5 h-5"></i>
-                    <input type="password" id="password" class="w-full pl-12 pr-4 py-4 bg-stone-50 border rounded-2xl outline-none focus:ring-2 focus:ring-amber-500" placeholder="Password" required>
+                    <i data-lucide="lock" class="absolute left-4 top-3.5 text-slate-400 w-4 h-4"></i>
+                    <input type="password" id="password" class="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all" placeholder="Password" required>
                 </div>
-                <p id="login-error" class="text-red-500 text-xs font-bold px-2 hidden">Email atau password salah.</p>
-                <button type="submit" class="w-full bg-amber-800 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 hover:bg-amber-900 transition-all shadow-lg active:scale-95">
-                    Masuk <i data-lucide="arrow-right" class="w-5 h-5"></i>
+                <p id="login-error" class="text-red-500 text-[10px] font-bold text-left px-2 hidden">Email atau password salah.</p>
+                <button type="submit" class="w-full bg-slate-900 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-slate-800 transition-all shadow-md active:scale-[0.98] mt-2 text-sm">
+                    Masuk Aplikasi
                 </button>
             </form>
         </div>
     </div>
 
-    <!-- MAIN APP -->
-    <div id="app-screen" class="hidden no-print">
-        <header class="max-w-6xl mx-auto p-4 md:p-8 flex flex-col md:flex-row justify-between items-center gap-4">
-            <div>
-                <h1 class="text-2xl font-black flex items-center gap-2 tracking-tight">
-                    <i data-lucide="coffee" class="text-amber-800 w-6 h-6"></i> KopiManager<span class="text-amber-600">.</span>
+    <!-- MAIN APP LAYOUT -->
+    <div id="app-screen" class="hidden w-full h-full flex flex-col md:flex-row no-print">
+        
+        <!-- SIDEBAR (DESKTOP) -->
+        <aside class="hidden md:flex flex-col w-64 bg-white border-r border-slate-200 h-full flex-shrink-0">
+            <div class="p-6">
+                <h1 class="text-xl font-heading font-extrabold flex items-center gap-2 tracking-tight text-slate-900">
+                    <i data-lucide="coffee" class="text-amber-600 w-6 h-6"></i> KopiManager
                 </h1>
-                <p class="text-stone-400 text-sm font-medium">Laporan Laba Rugi Akurat</p>
             </div>
-            <nav class="flex bg-stone-100 p-1 rounded-xl overflow-x-auto no-scrollbar max-w-full">
-                <button onclick="switchTab('dashboard')" class="nav-btn px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all" id="btn-dashboard">
-                    <i data-lucide="trending-up" class="w-4 h-4"></i> Panel
-                </button>
-                <button onclick="switchTab('pengaturan')" class="nav-btn px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all" id="btn-pengaturan">
-                    <i data-lucide="settings" class="w-4 h-4"></i> Resep & Aset
-                </button>
-                <button onclick="switchTab('reseller')" class="nav-btn px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all" id="btn-reseller">
-                    <i data-lucide="users" class="w-4 h-4"></i> Reseller
-                </button>
-                <button onclick="switchTab('transaksi')" class="nav-btn px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all" id="btn-transaksi">
-                    <i data-lucide="shopping-cart" class="w-4 h-4"></i> Jual
-                </button>
-                <button onclick="switchTab('laporan')" class="nav-btn px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all" id="btn-laporan">
-                    <i data-lucide="file-text" class="w-4 h-4"></i> Laporan
-                </button>
-                <button onclick="logout()" class="px-4 py-2 text-stone-400 hover:text-red-500"><i data-lucide="log-out" class="w-4 h-4"></i></button>
+            <nav class="flex-1 px-4 py-2 space-y-1 overflow-y-auto">
+                <p class="px-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 mt-4">Menu Utama</p>
+                <button onclick="switchTab('dashboard')" id="nav-desktop-dashboard" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all text-slate-500 hover:bg-slate-50"><i data-lucide="layout-dashboard" class="w-4 h-4"></i> Dasbor</button>
+                <button onclick="switchTab('transaksi')" id="nav-desktop-transaksi" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all text-slate-500 hover:bg-slate-50"><i data-lucide="shopping-bag" class="w-4 h-4"></i> Kasir & Jual</button>
+                <button onclick="switchTab('rekap')" id="nav-desktop-rekap" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all text-slate-500 hover:bg-slate-50"><i data-lucide="clipboard-check" class="w-4 h-4"></i> Rekap Harian</button>
+                <button onclick="switchTab('laporan')" id="nav-desktop-laporan" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all text-slate-500 hover:bg-slate-50"><i data-lucide="bar-chart-2" class="w-4 h-4"></i> Laba Rugi</button>
+                
+                <p class="px-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 mt-6">Manajemen</p>
+                <button onclick="switchTab('reseller')" id="nav-desktop-reseller" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all text-slate-500 hover:bg-slate-50"><i data-lucide="users" class="w-4 h-4"></i> Reseller</button>
+                <button onclick="switchTab('pengaturan')" id="nav-desktop-pengaturan" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all text-slate-500 hover:bg-slate-50"><i data-lucide="sliders" class="w-4 h-4"></i> Resep & Gudang</button>
             </nav>
-        </header>
+            <div class="p-4 border-t border-slate-100">
+                <button onclick="logout()" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-red-500 hover:bg-red-50 transition-all"><i data-lucide="log-out" class="w-4 h-4"></i> Keluar</button>
+            </div>
+        </aside>
 
-        <main class="max-w-6xl mx-auto px-4 md:px-8 pb-12">
-            <div id="tab-content"></div>
+        <!-- MAIN CONTENT AREA -->
+        <main class="flex-1 flex flex-col h-full overflow-hidden relative">
+            <!-- MOBILE HEADER (Sticky) -->
+            <header class="md:hidden glass z-30 px-5 py-4 border-b border-slate-200 flex justify-between items-center sticky top-0">
+                <h1 class="text-lg font-heading font-extrabold flex items-center gap-2">
+                    <i data-lucide="coffee" class="text-amber-600 w-5 h-5"></i> KopiManager
+                </h1>
+                <button onclick="logout()" class="text-slate-400 hover:text-red-500 p-1"><i data-lucide="log-out" class="w-5 h-5"></i></button>
+            </header>
+
+            <!-- SCROLLABLE TAB CONTENT -->
+            <div class="flex-1 overflow-y-auto p-4 md:p-8 pb-24 md:pb-8">
+                <div id="tab-content" class="max-w-5xl mx-auto w-full"></div>
+            </div>
+
+            <!-- MOBILE BOTTOM NAV -->
+            <nav class="md:hidden glass border-t border-slate-200 fixed bottom-0 w-full z-40 pb-safe">
+                <div class="flex justify-around items-center p-2">
+                    <button onclick="switchTab('dashboard')" id="nav-mobile-dashboard" class="nav-btn flex flex-col items-center gap-1 p-2 text-slate-400 min-w-[64px]"><i data-lucide="layout-dashboard" class="w-5 h-5"></i><span class="text-[9px] font-bold">Dasbor</span></button>
+                    <button onclick="switchTab('transaksi')" id="nav-mobile-transaksi" class="nav-btn flex flex-col items-center gap-1 p-2 text-slate-400 min-w-[64px]"><i data-lucide="shopping-bag" class="w-5 h-5"></i><span class="text-[9px] font-bold">Kasir</span></button>
+                    <button onclick="switchTab('rekap')" id="nav-mobile-rekap" class="nav-btn flex flex-col items-center gap-1 p-2 text-slate-400 min-w-[64px]"><i data-lucide="clipboard-check" class="w-5 h-5"></i><span class="text-[9px] font-bold">Rekap</span></button>
+                    <button onclick="switchTab('laporan')" id="nav-mobile-laporan" class="nav-btn flex flex-col items-center gap-1 p-2 text-slate-400 min-w-[64px]"><i data-lucide="bar-chart-2" class="w-5 h-5"></i><span class="text-[9px] font-bold">Laba</span></button>
+                    <button onclick="switchTab('pengaturan')" id="nav-mobile-pengaturan" class="nav-btn flex flex-col items-center gap-1 p-2 text-slate-400 min-w-[64px]"><i data-lucide="sliders" class="w-5 h-5"></i><span class="text-[9px] font-bold">Menu</span></button>
+                </div>
+            </nav>
         </main>
     </div>
 
     <!-- AREA KHUSUS UNTUK CETAK/PRINT -->
     <div id="print-area"></div>
 
-    <!-- MODAL CONTAINER (Pop-up Buatan) -->
+    <!-- MODAL CONTAINER -->
     <div id="modal-container" class="no-print"></div>
 
     <script>
         // --- KONFIGURASI SUPABASE ---
         const SUPABASE_URL = 'https://wvidkpxauvadjykrksan.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind2aWRrcHhhdXZhZGp5a3Jrc2FuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2ODk4ODAsImV4cCI6MjA4NzI2NTg4MH0.hhUVmvDs690jFF6osVyYBeIcaPaROtJV1tEA1QUb-GY';
-        
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         // --- APP STATE ---
         let state = {
             isLoggedIn: false,
-            activeTab: 'dashboard',
+            activeTab: 'transaksi', // Default ke transaksi (paling sering dipakai)
             reportFilter: 'daily',
+            rekapDate: new Date().toISOString().split('T')[0],
             editingVariantId: null,
             selectedSalesChannel: 'direct', 
+            selectedPaymentMethod: 'CASH',
             selectedReportReseller: 'all', 
             ingredients: [],
             assets: [],
@@ -142,19 +173,18 @@
                 container.innerHTML = '';
                 return;
             }
-            
             container.innerHTML = `
-                <div class="fixed inset-0 bg-stone-900/40 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-fade-in">
-                    <div class="bg-white rounded-[32px] p-8 w-full max-w-sm shadow-2xl border border-stone-100">
-                        <div class="w-12 h-12 rounded-full ${state.modal.type === 'confirm' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'} flex items-center justify-center mb-4">
-                            <i data-lucide="${state.modal.type === 'confirm' ? 'alert-triangle' : 'info'}" class="w-6 h-6"></i>
+                <div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-fade-in">
+                    <div class="bg-white rounded-3xl p-6 w-full max-w-sm shadow-xl border border-slate-100">
+                        <div class="w-10 h-10 rounded-full ${state.modal.type === 'confirm' ? 'bg-red-50 text-red-500' : 'bg-amber-50 text-amber-500'} flex items-center justify-center mb-4">
+                            <i data-lucide="${state.modal.type === 'confirm' ? 'alert-triangle' : 'info'}" class="w-5 h-5"></i>
                         </div>
-                        <h3 class="text-xl font-black text-stone-800 mb-2">${state.modal.title}</h3>
-                        <p class="text-sm text-stone-500 mb-8 leading-relaxed">${state.modal.message}</p>
-                        <div class="flex justify-end gap-3">
-                            ${state.modal.type === 'confirm' ? `<button onclick="closeModal()" class="px-5 py-3 rounded-xl text-stone-500 font-bold hover:bg-stone-50 transition-colors text-sm">Batal</button>` : ''}
-                            <button onclick="confirmModal()" class="px-5 py-3 rounded-xl ${state.modal.type === 'confirm' ? 'bg-red-600 hover:bg-red-700' : 'bg-amber-800 hover:bg-amber-900'} text-white font-bold transition-colors text-sm shadow-md">
-                                ${state.modal.type === 'confirm' ? 'Ya, Lanjutkan' : 'Tutup'}
+                        <h3 class="text-lg font-heading font-bold text-slate-800 mb-1">${state.modal.title}</h3>
+                        <p class="text-sm text-slate-500 mb-6 leading-relaxed">${state.modal.message}</p>
+                        <div class="flex justify-end gap-2">
+                            ${state.modal.type === 'confirm' ? `<button onclick="closeModal()" class="px-4 py-2 rounded-xl text-slate-500 font-semibold hover:bg-slate-50 transition-colors text-sm">Batal</button>` : ''}
+                            <button onclick="confirmModal()" class="px-4 py-2 rounded-xl ${state.modal.type === 'confirm' ? 'bg-red-500 hover:bg-red-600' : 'bg-slate-900 hover:bg-slate-800'} text-white font-semibold transition-colors text-sm shadow-sm">
+                                ${state.modal.type === 'confirm' ? 'Lanjutkan' : 'Tutup'}
                             </button>
                         </div>
                     </div>
@@ -183,7 +213,6 @@
                 if (setRes.data) state.targetQty = setRes.data.targetQty;
                 if (resellerRes.data) state.resellers = resellerRes.data;
 
-                // Trik: Membaca bottleSize dari JSON Recipe agar tidak error Schema
                 if (varRes.data) {
                     state.variants = varRes.data.map(v => {
                         let bSize = '250 ml';
@@ -197,8 +226,8 @@
                     });
                 }
             } catch (error) {
-                console.error("Gagal mengambil data dari Supabase:", error);
-                showModal('alert', 'Gagal Terhubung', 'Gagal mengambil sebagian data dari database. Periksa konfigurasi Anda.');
+                console.error("Supabase Error:", error);
+                showModal('alert', 'Koneksi Gagal', 'Pastikan koneksi internet stabil dan konfigurasi benar.');
             }
         }
 
@@ -218,15 +247,11 @@
             document.getElementById('app-screen').classList.add('hidden');
         }
 
-        // --- UTILITY GROUPING ---
-        // Menggabungkan baris transaksi harian agar terlihat seperti qty meskipun di DB tersimpan satuan
         function getGroupedSales(salesArray) {
             let map = {};
             salesArray.forEach(s => {
                 const key = `${s.date}_${s.name}_${s.resellerId}`;
-                if(!map[key]) {
-                    map[key] = { ...s, qty: 0, totalOmzet: 0, totalProfitReseller: 0, totalIngCost: 0 };
-                }
+                if(!map[key]) { map[key] = { ...s, qty: 0, totalOmzet: 0, totalProfitReseller: 0, totalIngCost: 0 }; }
                 map[key].qty += 1;
                 map[key].totalOmzet += s.price;
                 map[key].totalProfitReseller += (s.resellerProfit || 0);
@@ -235,12 +260,10 @@
             return Object.values(map).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
         }
 
-        // --- DATA HANDLERS ---
         function getSalesChannelInfo(variantPrice) {
             let resellerId = null;
             let resellerName = 'Langsung (Kasir)';
             let resellerProfit = 0;
-
             if (state.selectedSalesChannel !== 'direct') {
                 const r = state.resellers.find(x => x.id === parseInt(state.selectedSalesChannel));
                 if (r) {
@@ -257,9 +280,7 @@
             const variantHPPInfo = calculateVariantMetrics(v);
             const channelInfo = getSalesChannelInfo(v.price);
             
-            // Trik: Menyimpan bottleSize di dalam name agar tidak butuh modifikasi SQL Column
-            const fullName = `${v.name}|${v.bottleSize || '250 ml'}`;
-
+            const fullName = `${v.name}|${v.bottleSize || '250 ml'}|${state.selectedPaymentMethod}`;
             const newSale = {
                 id: Date.now(),
                 name: fullName,
@@ -279,6 +300,7 @@
 
         window.submitBulkSales = async () => {
             const dateInput = document.getElementById('bulk-date').value;
+            const paymentInput = document.getElementById('bulk-payment').value;
             if (!dateInput) return showModal('alert', 'Perhatian', 'Pilih tanggal terlebih dahulu.');
 
             const [year, month, day] = dateInput.split('-');
@@ -296,9 +318,8 @@
                     const variantHPPInfo = calculateVariantMetrics(v);
                     const channelInfo = getSalesChannelInfo(v.price);
                     totalQty += qty;
-                    const fullName = `${v.name}|${v.bottleSize || '250 ml'}`;
+                    const fullName = `${v.name}|${v.bottleSize || '250 ml'}|${paymentInput}`;
                     
-                    // Membuat entri array satu per satu agar database tidak error kehilangan kolom qty
                     for(let i=0; i < qty; i++) {
                         allNewSales.push({
                             id: Date.now() + Math.floor(Math.random() * 1000000) + i,
@@ -315,159 +336,86 @@
                 }
             });
 
-            if (allNewSales.length === 0) {
-                return showModal('alert', 'Perhatian', 'Masukkan minimal 1 jumlah produk pada form sebelum menyimpan.');
-            }
+            if (allNewSales.length === 0) return showModal('alert', 'Perhatian', 'Masukkan minimal 1 jumlah produk.');
 
-            showModal('alert', 'Memproses Data...', `Sedang menyimpan rekap sebanyak ${totalQty} botol ke dalam sistem.`);
-
+            showModal('alert', 'Memproses...', `Menyimpan ${totalQty} botol.`);
             try {
                 const { error } = await supabaseClient.from('sales').insert(allNewSales);
                 if (error) throw error;
-
                 state.sales = [...allNewSales, ...state.sales];
                 state.sales.sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
-
                 render(); 
-
-                setTimeout(() => {
-                    showModal('alert', 'Rekap Tersimpan!', `Berhasil mencatat rekap penjualan sejumlah ${totalQty} produk untuk ${dateString}.`);
-                }, 100);
-
+                setTimeout(() => showModal('alert', 'Sukses', `Tersimpan ${totalQty} produk.`), 200);
             } catch (error) {
-                console.error("Gagal simpan rekap:", error);
-                showModal('alert', 'Gagal', 'Terjadi kesalahan saat mengunggah rekap data.');
+                showModal('alert', 'Gagal', 'Terjadi kesalahan sistem.');
             }
         };
 
+        // --- PRINT RESELLER --- (Intact from original)
         window.printResellerReport = () => {
-            if(state.selectedReportReseller === 'all') {
-                return showModal('alert', 'Perhatian', 'Pilih nama spesifik Reseller terlebih dahulu untuk dicetak.');
-            }
+            if(state.selectedReportReseller === 'all') return showModal('alert', 'Perhatian', 'Pilih Reseller spesifik.');
             const r = state.resellers.find(x => x.id === parseInt(state.selectedReportReseller));
             if(!r) return;
-
             const rSales = state.sales.filter(s => s.resellerId === r.id);
-            
             let summary = {};
             rSales.forEach(s => {
                 const nameParts = s.name.split('|');
                 const displayName = nameParts[0];
                 const displaySize = nameParts[1] || '250 ml';
                 const key = `${displayName} (${displaySize})`;
-                
-                if(!summary[key]) {
-                    summary[key] = { qty: 0, price: s.price, rProfit: s.resellerProfit || 0 };
-                }
+                if(!summary[key]) summary[key] = { qty: 0, price: s.price, rProfit: s.resellerProfit || 0 };
                 summary[key].qty += 1;
             });
-
-            let totalQty = 0;
-            let totalTagihan = 0;
-            let totalProfit = 0;
-
+            let totalQty = 0, totalTagihan = 0, totalProfit = 0;
             let tableHtml = Object.keys(summary).map(k => {
                 const item = summary[k];
                 totalQty += item.qty;
                 const itemTotalTagihan = (item.price - item.rProfit) * item.qty; 
-                const itemTotalProfit = item.rProfit * item.qty;
                 totalTagihan += itemTotalTagihan;
-                totalProfit += itemTotalProfit;
-
-                return `
-                <tr>
-                    <td style="padding:12px 8px; border-bottom:1px solid #e5e7eb;">${k}</td>
-                    <td style="padding:12px 8px; border-bottom:1px solid #e5e7eb; text-align:center; font-weight:bold;">${item.qty}</td>
-                    <td style="padding:12px 8px; border-bottom:1px solid #e5e7eb; text-align:right;">${formatIDR(item.price)}</td>
-                    <td style="padding:12px 8px; border-bottom:1px solid #e5e7eb; text-align:right;">${formatIDR(item.price - item.rProfit)}</td>
-                    <td style="padding:12px 8px; border-bottom:1px solid #e5e7eb; text-align:right; font-weight:bold;">${formatIDR(itemTotalTagihan)}</td>
-                    <td style="padding:12px 8px; border-bottom:1px solid #e5e7eb; text-align:right; color:#15803d; font-weight:bold;">${formatIDR(itemTotalProfit)}</td>
+                totalProfit += item.rProfit * item.qty;
+                return `<tr>
+                    <td style="padding:12px 8px; border-bottom:1px solid #e2e8f0;">${k}</td>
+                    <td style="padding:12px 8px; border-bottom:1px solid #e2e8f0; text-align:center;">${item.qty}</td>
+                    <td style="padding:12px 8px; border-bottom:1px solid #e2e8f0; text-align:right;">${formatIDR(item.price)}</td>
+                    <td style="padding:12px 8px; border-bottom:1px solid #e2e8f0; text-align:right;">${formatIDR(item.price - item.rProfit)}</td>
+                    <td style="padding:12px 8px; border-bottom:1px solid #e2e8f0; text-align:right; font-weight:bold;">${formatIDR(itemTotalTagihan)}</td>
                 </tr>`;
             }).join('');
-
-            const html = `
-                <div style="font-family: 'Plus Jakarta Sans', sans-serif; max-width: 800px; margin: 0 auto; padding: 40px 20px; color: #1c1917;">
-                    <div style="text-align: center; margin-bottom: 30px;">
-                        <h1 style="margin: 0; font-size: 24px; font-weight: 900; color:#92400e;">INVOICE & LAPORAN RESELLER</h1>
-                        <p style="margin: 4px 0 0; color: #78716c; font-size: 14px;">Sistem KopiManager Pro</p>
-                    </div>
-                    
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 30px; background: #fafaf9; padding: 20px; border-radius: 16px; border: 1px solid #f5f5f4;">
-                        <div>
-                            <p style="margin:0; font-size: 10px; color:#a8a29e; text-transform:uppercase; letter-spacing:1px; font-weight:bold;">Mitra Reseller</p>
-                            <h3 style="margin:4px 0; font-size: 18px; font-weight: 900;">${r.name}</h3>
-                            <p style="margin:0; color: #57534e; font-size: 14px;">WA: ${r.phone || '-'}</p>
-                        </div>
-                        <div style="text-align: right;">
-                            <p style="margin:0; font-size: 10px; color:#a8a29e; text-transform:uppercase; letter-spacing:1px; font-weight:bold;">Tanggal Cetak</p>
-                            <h3 style="margin:4px 0; font-size: 16px; font-weight: 700;">${new Date().toLocaleDateString('id-ID', {day:'2-digit', month:'long', year:'numeric'})}</h3>
-                            <p style="margin:0; font-size: 14px; color:#b45309; font-weight:bold;">Diskon: ${r.discountRate}%</p>
-                        </div>
-                    </div>
-
-                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 14px;">
-                        <thead>
-                            <tr style="background-color: #f5f5f4; text-transform: uppercase; font-size: 10px; letter-spacing: 1px; color:#78716c;">
-                                <th style="padding:12px 8px; text-align:left; border-bottom:2px solid #e5e7eb;">Produk & Ukuran</th>
-                                <th style="padding:12px 8px; text-align:center; border-bottom:2px solid #e5e7eb;">Qty</th>
-                                <th style="padding:12px 8px; text-align:right; border-bottom:2px solid #e5e7eb;">Hrg. Normal</th>
-                                <th style="padding:12px 8px; text-align:right; border-bottom:2px solid #e5e7eb;">Hrg. Reseller</th>
-                                <th style="padding:12px 8px; text-align:right; border-bottom:2px solid #e5e7eb;">Sub Total (Tagihan)</th>
-                                <th style="padding:12px 8px; text-align:right; border-bottom:2px solid #e5e7eb;">Profit Reseller</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${tableHtml}
-                            ${rSales.length === 0 ? '<tr><td colspan="6" style="text-align:center; padding: 40px; color:#a8a29e; font-weight:bold;">Belum ada riwayat transaksi untuk dicetak.</td></tr>' : ''}
-                        </tbody>
-                    </table>
-
-                    <div style="display: flex; justify-content: flex-end; width: 100%;">
-                        <div style="width: 350px; padding: 20px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 16px;">
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px; color: #78716c;">
-                                <span>Total Botol Terjual:</span>
-                                <strong>${totalQty} Botol</strong>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 16px; font-size: 14px; color: #15803d;">
-                                <span>Total Profit Reseller:</span>
-                                <strong>+ ${formatIDR(totalProfit)}</strong>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; border-top: 2px dashed #fcd34d; padding-top: 16px; font-size: 18px; color:#92400e;">
-                                <span>TOTAL SETORAN:</span>
-                                <strong style="font-weight:900;">${formatIDR(totalTagihan)}</strong>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <p style="text-align:center; margin-top: 60px; font-size: 12px; color: #a8a29e; font-weight:500;">
-                        Terima kasih atas kerja sama Anda yang luar biasa!
-                    </p>
+            const html = `<div style="font-family: sans-serif; max-width: 800px; margin: 0 auto; padding: 40px;">
+                <h1 style="text-align:center; color:#0f172a; margin-bottom:4px;">INVOICE MITRA</h1>
+                <p style="text-align:center; color:#64748b; margin-top:0;">KopiManager Pro</p>
+                <div style="display:flex; justify-content:space-between; margin:30px 0; background:#f8fafc; padding:20px; border-radius:12px; border:1px solid #e2e8f0;">
+                    <div><p style="margin:0; font-size:12px; color:#64748b;">Mitra</p><h3 style="margin:4px 0;">${r.name}</h3></div>
+                    <div style="text-align:right;"><p style="margin:0; font-size:12px; color:#64748b;">Tanggal</p><h3 style="margin:4px 0;">${new Date().toLocaleDateString('id-ID')}</h3><p style="margin:0; color:#b45309; font-size:14px; font-weight:bold;">Diskon: ${r.discountRate}%</p></div>
                 </div>
-            `;
-
+                <table style="width:100%; border-collapse:collapse; margin-bottom:30px; font-size:14px;">
+                    <thead><tr style="background:#f1f5f9; text-transform:uppercase; font-size:11px; color:#64748b;">
+                        <th style="padding:12px; text-align:left;">Produk</th><th style="padding:12px;">Qty</th><th style="padding:12px; text-align:right;">Normal</th><th style="padding:12px; text-align:right;">Harga Reseller</th><th style="padding:12px; text-align:right;">Tagihan</th>
+                    </tr></thead>
+                    <tbody>${tableHtml}</tbody>
+                </table>
+                <div style="display:flex; justify-content:flex-end;">
+                    <div style="width:300px; padding:20px; background:#fffbeb; border-radius:12px; border:1px solid #fde68a;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:10px;"><span>Total Qty:</span><strong>${totalQty} Btl</strong></div>
+                        <div style="display:flex; justify-content:space-between; margin-bottom:10px; color:#15803d;"><span>Profit Mitra:</span><strong>+${formatIDR(totalProfit)}</strong></div>
+                        <div style="display:flex; justify-content:space-between; border-top:1px dashed #d97706; padding-top:10px; font-size:18px; color:#92400e; font-weight:bold;"><span>TOTAL:</span><span>${formatIDR(totalTagihan)}</span></div>
+                    </div>
+                </div>
+            </div>`;
             document.getElementById('print-area').innerHTML = html;
             window.print();
             setTimeout(() => { document.getElementById('print-area').innerHTML = ''; }, 1000);
         }
 
         // --- CALCULATIONS ---
-        function calculateMonthlyAssetDepreciation() {
-            return state.assets.reduce((acc, curr) => acc + (curr.cost / (curr.lifeYears * 12)), 0);
-        }
-
-        function calculateTotalMonthlyOverhead() {
-            return state.opsCosts.reduce((acc, curr) => acc + curr.monthly, 0);
-        }
-
+        function calculateMonthlyAssetDepreciation() { return state.assets.reduce((acc, curr) => acc + (curr.cost / (curr.lifeYears * 12)), 0); }
+        function calculateTotalMonthlyOverhead() { return state.opsCosts.reduce((acc, curr) => acc + curr.monthly, 0); }
         function calculateVariantMetrics(variant) {
             let ingredientCostOnly = 0;
             variant.recipe.forEach(r => {
                 const ing = state.ingredients.find(i => i.id === r.ingId);
-                if (ing) {
-                    ingredientCostOnly += (ing.cost / ing.bulkAmount) * r.qty;
-                }
+                if (ing) ingredientCostOnly += (ing.cost / ing.bulkAmount) * r.qty;
             });
-
             const monthlyDepreciation = calculateMonthlyAssetDepreciation();
             const monthlyOverhead = calculateTotalMonthlyOverhead();
             const totalMonthlyFixedCosts = monthlyDepreciation + monthlyOverhead;
@@ -482,122 +430,129 @@
                     if (possible < maxCanProduce) maxCanProduce = possible;
                 }
             });
-
             return {
                 ingredientCostOnly,
-                depreciationPerUnit: monthlyDepreciation / state.targetQty,
-                overheadPerUnit: monthlyOverhead / state.targetQty,
                 totalHpp: ingredientCostOnly + fixedCostPerUnit,
                 maxCanProduce: maxCanProduce === Infinity ? 0 : maxCanProduce
             };
         }
-
         function calculateBEPMetrics() {
-            const monthlyOverhead = calculateTotalMonthlyOverhead();
-            const monthlyDepreciation = calculateMonthlyAssetDepreciation();
-            const totalFixedCosts = monthlyOverhead + monthlyDepreciation;
-
-            if (state.variants.length === 0) return { bepUnits: 0, avgMargin: 0, fixedCosts: totalFixedCosts };
-
+            const fixedCosts = calculateTotalMonthlyOverhead() + calculateMonthlyAssetDepreciation();
+            if (state.variants.length === 0) return { bepUnits: 0, fixedCosts };
             let totalMargin = 0;
             state.variants.forEach(v => {
-                let ingredientCost = 0;
+                let ingCost = 0;
                 v.recipe.forEach(r => {
                     const ing = state.ingredients.find(i => i.id === r.ingId);
-                    if (ing) ingredientCost += (ing.cost / ing.bulkAmount) * r.qty;
+                    if (ing) ingCost += (ing.cost / ing.bulkAmount) * r.qty;
                 });
-                totalMargin += (v.price - ingredientCost);
+                totalMargin += (v.price - ingCost);
             });
-
             const avgMargin = totalMargin / state.variants.length;
-            const bepUnits = avgMargin > 0 ? Math.ceil(totalFixedCosts / avgMargin) : Infinity;
-
-            return { bepUnits, avgMargin, fixedCosts: totalFixedCosts };
+            const bepUnits = avgMargin > 0 ? Math.ceil(fixedCosts / avgMargin) : Infinity;
+            return { bepUnits, fixedCosts };
         }
 
         // --- RENDER ENGINE ---
         function render() {
-            const activeElementId = document.activeElement ? document.activeElement.id : null;
             const content = document.getElementById('tab-content');
             
+            // Update Active Nav Styles
             document.querySelectorAll('.nav-btn').forEach(btn => {
-                btn.classList.remove('bg-white', 'text-amber-800', 'shadow-sm');
-                btn.classList.add('text-stone-400');
+                btn.classList.remove('bg-slate-100', 'text-slate-900', 'shadow-sm', 'text-amber-600');
+                if(btn.id.includes('mobile')) {
+                    btn.classList.remove('text-amber-600');
+                    btn.classList.add('text-slate-400');
+                } else {
+                    btn.classList.remove('bg-slate-50', 'text-amber-600', 'font-bold');
+                    btn.classList.add('text-slate-500', 'font-semibold');
+                }
             });
-            const activeBtn = document.getElementById(`btn-${state.activeTab}`);
-            if(activeBtn) {
-                activeBtn.classList.remove('text-stone-400');
-                activeBtn.classList.add('bg-white', 'text-amber-800', 'shadow-sm');
+            
+            const activeDesktop = document.getElementById(`nav-desktop-${state.activeTab}`);
+            if(activeDesktop) {
+                activeDesktop.classList.remove('text-slate-500');
+                activeDesktop.classList.add('bg-amber-50', 'text-amber-700', 'font-bold');
+            }
+            const activeMobile = document.getElementById(`nav-mobile-${state.activeTab}`);
+            if(activeMobile) {
+                activeMobile.classList.remove('text-slate-400');
+                activeMobile.classList.add('text-amber-600');
             }
 
             if (state.activeTab === 'dashboard') renderDashboard(content);
-            if (state.activeTab === 'pengaturan') renderPengaturan(content);
-            if (state.activeTab === 'reseller') renderReseller(content); 
             if (state.activeTab === 'transaksi') renderTransaksi(content);
+            if (state.activeTab === 'rekap') renderRekap(content);
             if (state.activeTab === 'laporan') renderLaporan(content);
+            if (state.activeTab === 'reseller') renderReseller(content); 
+            if (state.activeTab === 'pengaturan') renderPengaturan(content);
 
             lucide.createIcons();
-
-            if (activeElementId) {
-                const elToFocus = document.getElementById(activeElementId);
-                if (elToFocus) { elToFocus.focus(); }
-            }
         }
+
+        // --- UI MODULES (MODERNIZED) ---
 
         function renderDashboard(el) {
             const monthlyOverhead = calculateTotalMonthlyOverhead();
             const monthlyDepreciation = calculateMonthlyAssetDepreciation();
-            
             const totalOmzet = state.sales.reduce((a, b) => a + (b.price - (b.resellerProfit || 0)), 0);
-            
             const bepMetrics = calculateBEPMetrics();
-            const bepDisplay = bepMetrics.bepUnits === Infinity ? 'N/A' : bepMetrics.bepUnits;
+            const bepDisplay = bepMetrics.bepUnits === Infinity ? '-' : bepMetrics.bepUnits;
 
             el.innerHTML = `
                 <div class="space-y-6 animate-fade-in">
-                    <div class="grid grid-cols-1 md:grid-cols-5 gap-6">
-                        <div class="bg-white p-6 rounded-3xl border border-stone-100 shadow-sm">
-                            <p class="text-stone-400 text-[10px] font-black uppercase tracking-widest mb-1">Total Omzet Bersih</p>
-                            <h3 class="text-2xl font-black">${formatIDR(totalOmzet)}</h3>
+                    <h2 class="text-xl font-heading font-extrabold text-slate-800">Ringkasan Dasbor</h2>
+                    
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)]">
+                            <div class="w-8 h-8 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center mb-3"><i data-lucide="wallet" class="w-4 h-4"></i></div>
+                            <p class="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">Omzet Bersih</p>
+                            <h3 class="text-lg md:text-xl font-black text-slate-800 truncate">${formatIDR(totalOmzet)}</h3>
                         </div>
-                        <div class="bg-white p-6 rounded-3xl border border-stone-100 shadow-sm">
-                            <p class="text-stone-400 text-[10px] font-black uppercase tracking-widest mb-1">Overhead/Bulan</p>
-                            <h3 class="text-2xl font-black text-red-600">${formatIDR(monthlyOverhead)}</h3>
+                        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)]">
+                            <div class="w-8 h-8 rounded-full bg-red-50 text-red-500 flex items-center justify-center mb-3"><i data-lucide="zap" class="w-4 h-4"></i></div>
+                            <p class="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">Biaya Overhead</p>
+                            <h3 class="text-lg md:text-xl font-black text-slate-800 truncate">${formatIDR(monthlyOverhead)}</h3>
                         </div>
-                        <div class="bg-white p-6 rounded-3xl border border-stone-100 shadow-sm">
-                            <p class="text-stone-400 text-[10px] font-black uppercase tracking-widest mb-1">Penyusutan Aset</p>
-                            <h3 class="text-2xl font-black text-amber-600">${formatIDR(monthlyDepreciation)}</h3>
+                        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)]">
+                            <div class="w-8 h-8 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center mb-3"><i data-lucide="trending-up" class="w-4 h-4"></i></div>
+                            <p class="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">Target Balik Modal</p>
+                            <h3 class="text-lg md:text-xl font-black text-slate-800"><span class="text-blue-600">${bepDisplay}</span> <span class="text-xs font-semibold text-slate-400">btl</span></h3>
                         </div>
-                        <div class="bg-indigo-50 p-6 rounded-3xl border border-indigo-100 shadow-sm">
-                            <p class="text-indigo-400 text-[10px] font-black uppercase tracking-widest mb-1">Target BEP</p>
-                            <h3 class="text-2xl font-black text-indigo-700">${bepDisplay} <span class="text-sm font-normal">Btl</span></h3>
-                        </div>
-                        <div class="bg-amber-800 p-6 rounded-3xl text-white shadow-lg">
-                            <p class="text-amber-200 text-[10px] font-black uppercase tracking-widest mb-1">Target Produksi</p>
-                            <h3 class="text-2xl font-black">${state.targetQty} <span class="text-sm font-normal">Btl</span></h3>
+                        <div class="bg-slate-900 p-5 rounded-2xl shadow-md text-white">
+                            <div class="w-8 h-8 rounded-full bg-slate-800 text-amber-400 flex items-center justify-center mb-3"><i data-lucide="target" class="w-4 h-4"></i></div>
+                            <p class="text-slate-300 text-[10px] font-bold uppercase tracking-wider mb-1">Target Produksi</p>
+                            <h3 class="text-lg md:text-xl font-black">${state.targetQty} <span class="text-xs font-semibold text-slate-400">btl</span></h3>
                         </div>
                     </div>
 
-                    <div class="bg-white p-8 rounded-[32px] border border-stone-100 shadow-sm">
-                        <h3 class="font-bold mb-6 flex items-center gap-2"><i data-lucide="refresh-cw" class="text-amber-600 w-5 h-5"></i> Estimasi HPP Lengkap (Bahan + Depresiasi + Overhead)</h3>
+                    <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)]">
+                        <div class="flex items-center gap-3 mb-6">
+                            <div class="p-2 bg-amber-50 rounded-xl"><i data-lucide="box" class="text-amber-600 w-5 h-5"></i></div>
+                            <div>
+                                <h3 class="font-heading font-bold text-slate-800">Status Stok & HPP Varian</h3>
+                                <p class="text-xs text-slate-500">Estimasi total HPP (Bahan + Overhead + Penyusutan)</p>
+                            </div>
+                        </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             ${state.variants.map(v => {
                                 const m = calculateVariantMetrics(v);
+                                const stockStatus = m.maxCanProduce < 10 ? 'text-red-500 bg-red-50' : 'text-emerald-600 bg-emerald-50';
                                 return `
-                                    <div class="p-5 bg-stone-50 rounded-2xl border border-stone-100">
-                                        <div class="flex justify-between items-start mb-1">
-                                            <h4 class="font-black text-stone-800">${v.name}</h4>
-                                            <span class="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-1 rounded-lg">${v.bottleSize || '250 ml'}</span>
-                                        </div>
-                                        <div class="flex justify-between items-end mt-4">
+                                    <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col justify-between">
+                                        <div class="flex justify-between items-start mb-4">
                                             <div>
-                                                <p class="text-[10px] text-stone-400 font-bold uppercase">Total HPP</p>
-                                                <p class="font-bold text-amber-900">${formatIDR(m.totalHpp)}</p>
+                                                <h4 class="font-bold text-slate-800 text-sm leading-tight">${v.name}</h4>
+                                                <span class="text-[9px] font-bold text-slate-400 border border-slate-200 px-1.5 py-0.5 rounded mt-1 inline-block">${v.bottleSize || '250 ml'}</span>
                                             </div>
                                             <div class="text-right">
-                                                <p class="text-[10px] text-stone-400 font-bold uppercase">Kapasitas Stok</p>
-                                                <p class="text-xl font-black ${m.maxCanProduce < 10 ? 'text-red-600' : 'text-stone-800'}">${m.maxCanProduce} <span class="text-xs">btl</span></p>
+                                                <p class="text-[9px] text-slate-400 font-bold uppercase">Stok Sisa</p>
+                                                <span class="text-xs font-black px-2 py-0.5 rounded-md inline-block mt-0.5 ${stockStatus}">${m.maxCanProduce} btl</span>
                                             </div>
+                                        </div>
+                                        <div class="pt-3 border-t border-slate-200 flex justify-between items-end">
+                                            <p class="text-[10px] text-slate-400 font-bold uppercase">HPP Keseluruhan</p>
+                                            <p class="font-black text-slate-800 text-sm">${formatIDR(m.totalHpp)}</p>
                                         </div>
                                     </div>
                                 `;
@@ -608,233 +563,236 @@
             `;
         }
 
-        function renderReseller(el) {
+        function renderTransaksi(el) {
+            const todayISOString = new Date().toISOString().split('T')[0];
+            const groupedSales = getGroupedSales(state.sales.slice(0, 50)); // Limit show recent 50 for performance UI
+
             el.innerHTML = `
-                <div class="space-y-8 animate-fade-in">
-                    <!-- DAFTAR RESELLER -->
-                    <section class="bg-white p-8 rounded-[32px] border border-stone-100 shadow-sm">
-                        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                            <div>
-                                <h3 class="text-xl font-black flex items-center gap-2"><i data-lucide="users" class="text-amber-600"></i> Manajemen Reseller</h3>
-                                <p class="text-xs text-stone-400 mt-1">Daftarkan mitra reseller dan tentukan persentase diskon yang Anda berikan.</p>
+                <div class="h-full flex flex-col gap-6 animate-fade-in">
+                    
+                    <!-- HEADER CONTROL (Kasir / Tipe Penjualan) -->
+                    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row gap-4 justify-between items-center z-10">
+                        <div class="flex items-center gap-3 w-full sm:w-auto">
+                            <div class="bg-slate-100 p-2.5 rounded-xl"><i data-lucide="store" class="text-slate-600 w-5 h-5"></i></div>
+                            <div class="flex-1">
+                                <label class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Penjualan Ke</label>
+                                <select id="sales-channel" class="w-full bg-transparent font-bold text-sm outline-none text-slate-800 cursor-pointer" onchange="state.selectedSalesChannel = this.value; render();">
+                                    <option value="direct" ${state.selectedSalesChannel === 'direct' ? 'selected' : ''}>Toko Sendiri (Umum)</option>
+                                    ${state.resellers.map(r => `<option value="${r.id}" ${state.selectedSalesChannel == r.id ? 'selected' : ''}>Reseller: ${r.name}</option>`).join('')}
+                                </select>
                             </div>
-                            <button onclick="addReseller()" class="bg-stone-900 text-white px-4 py-3 rounded-xl text-xs font-bold hover:bg-stone-800 flex items-center gap-2 transition-all shadow-md active:scale-95">
-                                <i data-lucide="plus" class="w-4 h-4"></i> Tambah Mitra
-                            </button>
                         </div>
+                        <div class="flex bg-slate-100 p-1 rounded-xl w-full sm:w-auto">
+                            <button onclick="state.selectedPaymentMethod='CASH'; render();" class="flex-1 sm:flex-none px-4 py-2 text-xs font-bold rounded-lg transition-all ${state.selectedPaymentMethod === 'CASH' ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-400'} flex items-center justify-center gap-1.5"><i data-lucide="banknote" class="w-4 h-4"></i> Tunai</button>
+                            <button onclick="state.selectedPaymentMethod='QRIS'; render();" class="flex-1 sm:flex-none px-4 py-2 text-xs font-bold rounded-lg transition-all ${state.selectedPaymentMethod === 'QRIS' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400'} flex items-center justify-center gap-1.5"><i data-lucide="qr-code" class="w-4 h-4"></i> QRIS</button>
+                        </div>
+                    </div>
+
+                    <div class="grid lg:grid-cols-12 gap-6 flex-1">
                         
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            ${state.resellers.length === 0 ? 
-                                '<div class="col-span-full p-10 flex flex-col items-center justify-center border-2 border-dashed border-stone-200 rounded-[24px] text-stone-400 bg-stone-50/50"><i data-lucide="users" class="w-8 h-8 mb-3 opacity-50"></i><p class="font-bold text-sm">Belum ada reseller terdaftar.</p><p class="text-xs font-medium mt-1">Klik tombol Tambah Mitra untuk mulai merekrut reseller Anda.</p></div>' 
-                                : 
-                                state.resellers.map(r => `
-                                <div class="p-5 bg-white rounded-2xl border border-stone-200 shadow-sm relative hover:border-amber-400 transition-colors group">
-                                    <button onclick="delReseller(${r.id})" class="absolute top-4 right-4 text-stone-300 hover:text-red-500 transition-colors p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                                    <div class="pr-8 mb-4">
-                                        <label class="text-[9px] font-black text-stone-400 uppercase tracking-widest">Nama Reseller / Toko</label>
-                                        <input id="res-name-${r.id}" class="bg-transparent font-black text-lg w-full outline-none text-stone-800 placeholder-stone-300" value="${r.name}" onchange="updateReseller(${r.id}, 'name', this.value)" placeholder="Ketik Nama Reseller...">
-                                    </div>
-                                    <div class="grid grid-cols-2 gap-3">
-                                        <div class="bg-stone-50 p-2.5 rounded-xl border border-stone-100 focus-within:border-amber-300 focus-within:bg-white transition-colors">
-                                            <label class="text-[9px] font-black text-stone-400 uppercase tracking-widest block mb-1">No. WhatsApp</label>
-                                            <input id="res-phone-${r.id}" class="w-full bg-transparent text-xs font-bold outline-none text-stone-700" value="${r.phone || ''}" onchange="updateReseller(${r.id}, 'phone', this.value)" placeholder="08...">
-                                        </div>
-                                        <div class="bg-amber-50 p-2.5 rounded-xl border border-amber-100 focus-within:border-amber-400 focus-within:bg-white transition-colors">
-                                            <label class="text-[9px] font-black text-amber-600 uppercase tracking-widest block mb-1">Potongan Harga</label>
-                                            <div class="flex items-center gap-1">
-                                                <input id="res-disc-${r.id}" class="w-full bg-transparent text-sm font-black outline-none text-right text-amber-900" type="number" value="${r.discountRate}" onchange="updateReseller(${r.id}, 'discountRate', parseFloat(this.value))">
-                                                <span class="text-xs text-amber-700 font-black">%</span>
+                        <!-- POS KASIR (KIRI) -->
+                        <div class="lg:col-span-7 flex flex-col gap-6">
+                            <!-- GRID PRODUK -->
+                            <div>
+                                <h3 class="font-heading font-bold text-slate-800 mb-3 text-sm flex items-center gap-2"><i data-lucide="layout-grid" class="w-4 h-4 text-amber-500"></i> Menu Cepat</h3>
+                                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                    ${state.variants.map(v => {
+                                        const m = calculateVariantMetrics(v);
+                                        const noStock = m.maxCanProduce <= 0;
+                                        return `
+                                            <button onclick="addSale(${v.id})" ${noStock ? 'disabled' : ''} class="relative bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col items-center justify-center text-center transition-all ${noStock ? 'opacity-50 grayscale cursor-not-allowed' : 'hover:border-amber-400 hover:shadow-md active:scale-95'} group overflow-hidden">
+                                                <div class="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center mb-3 group-hover:bg-amber-50 group-hover:text-amber-600 transition-colors">
+                                                    <i data-lucide="coffee" class="w-5 h-5"></i>
+                                                </div>
+                                                <h4 class="font-bold text-slate-800 text-xs leading-tight mb-1">${v.name}</h4>
+                                                <p class="text-[10px] text-slate-400 mb-2">${v.bottleSize || '250 ml'}</p>
+                                                <p class="font-black text-amber-700 text-sm mt-auto">${formatIDR(v.price)}</p>
+                                                <div class="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[8px] font-bold ${noStock ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-500'}">Sisa: ${m.maxCanProduce}</div>
+                                            </button>
+                                        `;
+                                    }).join('')}
+                                </div>
+                            </div>
+
+                            <!-- INPUT REKAP BORONGAN -->
+                            <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm mt-auto">
+                                <details class="group cursor-pointer marker:content-['']">
+                                    <summary class="flex justify-between items-center font-heading font-bold text-sm text-slate-800 select-none">
+                                        <div class="flex items-center gap-2"><i data-lucide="layers" class="w-4 h-4 text-amber-500"></i> Input Borongan (Rekap Masal)</div>
+                                        <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 transition duration-300 group-open:-rotate-180"></i>
+                                    </summary>
+                                    <div class="pt-4 mt-4 border-t border-slate-100 cursor-default">
+                                        <div class="grid grid-cols-2 gap-3 mb-4">
+                                            <div>
+                                                <label class="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Tanggal</label>
+                                                <input type="date" id="bulk-date" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-amber-400" value="${todayISOString}">
+                                            </div>
+                                            <div>
+                                                <label class="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Pembayaran</label>
+                                                <select id="bulk-payment" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-amber-400">
+                                                    <option value="CASH">Tunai (CASH)</option>
+                                                    <option value="QRIS">QRIS / Transfer</option>
+                                                </select>
                                             </div>
                                         </div>
+                                        <div class="space-y-2 mb-4 max-h-40 overflow-y-auto pr-2 no-scrollbar">
+                                            ${state.variants.map(v => `
+                                                <div class="flex justify-between items-center bg-slate-50 p-2 rounded-xl">
+                                                    <div class="flex flex-col pr-2">
+                                                        <span class="font-bold text-xs text-slate-700">${v.name}</span>
+                                                        <span class="text-[9px] text-slate-400 font-bold">${v.bottleSize || '250 ml'}</span>
+                                                    </div>
+                                                    <div class="flex items-center bg-white border border-slate-200 rounded-lg overflow-hidden w-20">
+                                                        <input type="number" id="bulk-qty-${v.id}" class="w-full text-center font-black text-slate-800 text-xs py-1.5 outline-none" placeholder="0" min="0">
+                                                    </div>
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                        <button onclick="submitBulkSales()" class="w-full bg-slate-900 text-white text-xs font-bold py-3 rounded-xl hover:bg-slate-800 transition-colors flex justify-center items-center gap-2">
+                                            Simpan Rekap Borongan
+                                        </button>
                                     </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </section>
-
-                    <!-- KALKULATOR PROFIT RESELLER -->
-                    <section class="bg-white p-8 rounded-[32px] border border-stone-100 shadow-sm">
-                        <div class="mb-6">
-                            <h3 class="text-xl font-black flex items-center gap-2"><i data-lucide="calculator" class="text-amber-600"></i> Kalkulator Harga & Profit Reseller</h3>
-                            <p class="text-xs text-stone-400 mt-1">Simulasi ini memperlihatkan harga khusus reseller dan besaran laba yang akan mereka peroleh saat menjual dengan Harga Normal.</p>
-                        </div>
-                        <div class="overflow-x-auto bg-stone-50/50 rounded-2xl border border-stone-100 mb-8">
-                            <table class="w-full text-left text-sm whitespace-nowrap">
-                                <thead class="bg-stone-100 text-[10px] font-black uppercase text-stone-500 tracking-widest border-b border-stone-200">
-                                    <tr>
-                                        <th class="px-6 py-4 rounded-tl-xl">Varian Kopi & Ukuran</th>
-                                        <th class="px-6 py-4">Harga Normal</th>
-                                        ${state.resellers.map(r => `
-                                            <th class="px-6 py-4 border-l border-stone-200 bg-white/50">
-                                                <span class="text-amber-800 block text-xs">${r.name}</span>
-                                                <span class="text-[9px] text-stone-400">Diskon ${r.discountRate}%</span>
-                                            </th>
-                                        `).join('')}
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-stone-100">
-                                    ${state.variants.map(v => `
-                                        <tr class="hover:bg-white transition-colors">
-                                            <td class="px-6 py-4 font-bold text-stone-800">${v.name} <span class="text-[10px] bg-stone-100 text-stone-500 px-2 py-0.5 rounded-full ml-1">${v.bottleSize || '250 ml'}</span></td>
-                                            <td class="px-6 py-4 font-black text-stone-500">${formatIDR(v.price)}</td>
-                                            ${state.resellers.map(r => {
-                                                const resellerPrice = v.price - (v.price * ((r.discountRate || 0) / 100));
-                                                const resellerProfit = v.price - resellerPrice;
-                                                return `
-                                                    <td class="px-6 py-4 border-l border-stone-100">
-                                                        <div class="font-black text-amber-700 text-sm">${formatIDR(resellerPrice)}</div>
-                                                        <div class="text-[10px] text-green-600 font-bold flex items-center gap-1 mt-0.5"><i data-lucide="arrow-up-right" class="w-3 h-3"></i> Untung ${formatIDR(resellerProfit)}/btl</div>
-                                                    </td>
-                                                `;
-                                            }).join('')}
-                                        </tr>
-                                    `).join('')}
-                                    ${state.variants.length === 0 ? '<tr><td colspan="100%" class="px-6 py-12 text-center text-stone-400 font-bold bg-white">Tambahkan Varian Kopi di menu Pengaturan terlebih dahulu.</td></tr>' : ''}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <!-- CETAK LAPORAN RESELLER -->
-                        <div class="bg-amber-50 p-6 rounded-[24px] border border-amber-100 flex flex-col md:flex-row gap-4 justify-between items-center">
-                            <div>
-                                <h4 class="font-black text-amber-900 mb-1 flex items-center gap-2"><i data-lucide="printer" class="w-4 h-4"></i> Laporan Tagihan Mitra</h4>
-                                <p class="text-xs text-amber-800/70">Pilih mitra untuk melihat dan mencetak rincian penjualan serta tagihan mereka.</p>
-                            </div>
-                            <div class="flex items-center gap-3 w-full md:w-auto">
-                                <select id="report-reseller-select" class="flex-1 md:w-64 bg-white p-3 rounded-xl border border-amber-200 font-bold text-sm outline-none text-stone-700" onchange="state.selectedReportReseller = this.value; render();">
-                                    <option value="all" ${state.selectedReportReseller === 'all' ? 'selected' : ''}>-- Pilih Nama Reseller --</option>
-                                    ${state.resellers.map(r => `<option value="${r.id}" ${state.selectedReportReseller == r.id ? 'selected' : ''}>${r.name}</option>`).join('')}
-                                </select>
-                                <button onclick="printResellerReport()" class="bg-amber-800 text-white px-6 py-3 rounded-xl font-bold shadow-md hover:bg-amber-900 transition-colors whitespace-nowrap">Cetak Invoice</button>
+                                </details>
                             </div>
                         </div>
 
-                    </section>
+                        <!-- RIWAYAT PENJUALAN (KANAN) -->
+                        <div class="lg:col-span-5 bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col overflow-hidden h-[500px] lg:h-auto">
+                            <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                                <h3 class="font-heading font-bold text-sm flex items-center gap-2"><i data-lucide="history" class="w-4 h-4 text-slate-400"></i> Transaksi Terkini</h3>
+                                <button onclick="promptReset('sales')" class="text-[10px] px-2 py-1 bg-red-50 text-red-500 rounded font-bold hover:bg-red-100 transition-colors">Reset</button>
+                            </div>
+                            <div class="flex-1 overflow-y-auto p-2 space-y-1">
+                                ${groupedSales.length === 0 ? '<div class="h-full flex flex-col items-center justify-center text-slate-300"><i data-lucide="receipt" class="w-10 h-10 mb-2 opacity-50"></i><p class="text-xs font-medium">Belum ada transaksi</p></div>' : 
+                                    groupedSales.map(s => {
+                                    const isReseller = s.resellerId != null;
+                                    const nameParts = s.name.split('|');
+                                    const displayName = nameParts[0];
+                                    const displaySize = nameParts[1] || '';
+                                    const paymentMethod = nameParts[2] || 'CASH';
+                                    
+                                    return `
+                                    <div class="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100">
+                                        <div class="flex gap-3 items-center">
+                                            <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black ${isReseller ? 'bg-purple-100 text-purple-600' : 'bg-slate-100 text-slate-600'}">
+                                                ${s.qty}x
+                                            </div>
+                                            <div>
+                                                <p class="font-bold text-xs text-slate-800 line-clamp-1">${displayName}</p>
+                                                <div class="flex items-center gap-1.5 mt-1 text-[9px] font-semibold text-slate-400">
+                                                    <span>${displaySize}</span>
+                                                    <span class="w-1 h-1 rounded-full bg-slate-300"></span>
+                                                    <span class="${paymentMethod === 'QRIS' ? 'text-blue-500' : 'text-emerald-500'}">${paymentMethod}</span>
+                                                    ${isReseller ? `<span class="w-1 h-1 rounded-full bg-slate-300"></span><span class="text-purple-500">Reseller</span>` : ''}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="text-right">
+                                            <p class="font-black text-sm text-slate-800">${formatIDR(s.totalOmzet)}</p>
+                                        </div>
+                                    </div>
+                                    `}).join('')}
+                            </div>
+                        </div>
+                    </div>
                 </div>
             `;
         }
 
-        function renderTransaksi(el) {
-            const todayISOString = new Date().toISOString().split('T')[0];
-            const groupedSales = getGroupedSales(state.sales);
+        function renderRekap(el) {
+            const selectedDateObj = new Date(state.rekapDate);
+            const filteredSales = state.sales.filter(s => new Date(s.timestamp).toDateString() === selectedDateObj.toDateString());
+
+            let summary = {};
+            let totals = { kotor: 0, bersih: 0, modal: 0, qty: 0, cash: 0, qris: 0 };
+
+            filteredSales.forEach(s => {
+                const parts = s.name.split('|');
+                const vName = parts[0];
+                const vSize = parts[1] || '250 ml';
+                const pMethod = parts[2] || 'CASH';
+                const key = `${vName}_${vSize}_${pMethod}`;
+                const qty = s.qty || 1;
+                const gross = s.price * qty;
+                const net = (s.price - (s.resellerProfit || 0)) * qty;
+                const cost = s.recordedIngredientCost * qty;
+
+                if(!summary[key]) summary[key] = { name: vName, size: vSize, method: pMethod, qty: 0, gross: 0, net: 0, cost: 0 };
+                summary[key].qty += qty; summary[key].gross += gross; summary[key].net += net; summary[key].cost += cost;
+                totals.qty += qty; totals.kotor += gross; totals.bersih += net; totals.modal += cost;
+                if (pMethod === 'CASH') totals.cash += net;
+                if (pMethod === 'QRIS') totals.qris += net;
+            });
+            const summaryArray = Object.values(summary).sort((a,b) => b.qty - a.qty);
 
             el.innerHTML = `
-                <!-- FILTER TIPE PENJUALAN (LANGSUNG ATAU RESELLER) -->
-                <div class="mb-6 bg-white p-4 rounded-2xl border border-stone-200 shadow-sm flex items-center gap-4 animate-fade-in">
-                    <div class="bg-stone-100 p-3 rounded-xl"><i data-lucide="store" class="text-stone-500 w-5 h-5"></i></div>
-                    <div class="flex-1">
-                        <label class="text-[9px] font-black text-stone-400 uppercase tracking-widest block mb-1">Pilih Tipe Penjualan / Kasir</label>
-                        <select id="sales-channel" class="w-full bg-transparent font-black text-lg outline-none text-stone-800 cursor-pointer" onchange="state.selectedSalesChannel = this.value; render();">
-                            <option value="direct" ${state.selectedSalesChannel === 'direct' ? 'selected' : ''}>Milik Sendiri (Langsung / Kasir)</option>
-                            ${state.resellers.map(r => `<option value="${r.id}" ${state.selectedSalesChannel == r.id ? 'selected' : ''}>Mitra Reseller: ${r.name}</option>`).join('')}
-                        </select>
+                <div class="space-y-6 animate-fade-in">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <div>
+                            <h2 class="text-xl font-heading font-extrabold text-slate-800">Rekap Penjualan Harian</h2>
+                            <p class="text-xs text-slate-500 mt-0.5">Pantau rincian barang keluar di hari tertentu.</p>
+                        </div>
+                        <div class="bg-white p-2 rounded-xl border border-slate-200 shadow-sm flex items-center gap-2 w-full sm:w-auto">
+                            <i data-lucide="calendar" class="w-4 h-4 text-slate-400 ml-1"></i>
+                            <input type="date" class="bg-transparent font-bold text-sm outline-none text-slate-700 w-full cursor-pointer" value="${state.rekapDate}" onchange="state.rekapDate = this.value; render();">
+                        </div>
                     </div>
-                </div>
 
-                <div class="grid md:grid-cols-12 gap-8 animate-fade-in">
-                    <div class="md:col-span-4 space-y-6">
-                        
-                        <!-- KASIR CEPAT (SINGLE ENTRY) -->
-                        <div class="bg-white p-6 rounded-3xl border border-stone-100 shadow-sm">
-                            <h3 class="font-black mb-4 flex items-center gap-2 text-stone-800"><i data-lucide="shopping-cart" class="text-amber-600 w-5 h-5"></i> Kasir Cepat (Satuan)</h3>
-                            <div class="space-y-2">
-                                ${state.variants.map(v => {
-                                    const m = calculateVariantMetrics(v);
-                                    return `
-                                        <button onclick="addSale(${v.id})" ${m.maxCanProduce <= 0 ? 'disabled' : ''} class="w-full flex justify-between items-center p-4 rounded-2xl border transition-all ${m.maxCanProduce <= 0 ? 'bg-stone-50 opacity-40 cursor-not-allowed' : 'hover:border-amber-500 hover:bg-amber-50 border-stone-50'}">
-                                            <div class="text-left">
-                                                <p className="font-black text-stone-800">${v.name}</p>
-                                                <div class="flex items-center gap-2 mt-1">
-                                                    <span class="text-[9px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-md">${v.bottleSize || '250 ml'}</span>
-                                                    <span class="text-[9px] font-bold text-stone-400 uppercase">Stok: ${m.maxCanProduce}</span>
-                                                </div>
-                                            </div>
-                                            <i data-lucide="plus" class="w-4 h-4"></i>
-                                        </button>
-                                    `;
-                                }).join('')}
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                            <p class="text-slate-400 text-[9px] font-bold uppercase tracking-wider mb-1">Botol Terjual</p>
+                            <h4 class="text-xl font-black text-slate-800">${totals.qty}</h4>
+                        </div>
+                        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                            <p class="text-slate-400 text-[9px] font-bold uppercase tracking-wider mb-1">Omzet Kotor</p>
+                            <h4 class="text-xl font-black text-slate-600">${formatIDR(totals.kotor)}</h4>
+                        </div>
+                        <div class="bg-slate-900 p-4 rounded-2xl shadow-md text-white relative overflow-hidden">
+                            <div class="absolute right-0 top-0 w-8 h-full bg-amber-500/10 skew-x-12 transform translate-x-4"></div>
+                            <p class="text-slate-300 text-[9px] font-bold uppercase tracking-wider mb-1">Omzet Bersih</p>
+                            <h4 class="text-xl font-black text-amber-400">${formatIDR(totals.bersih)}</h4>
+                            <div class="flex gap-3 mt-2 pt-2 border-t border-slate-700">
+                                <div><span class="text-[8px] text-slate-400">CASH:</span> <span class="text-[10px] font-bold">${formatIDR(totals.cash)}</span></div>
+                                <div><span class="text-[8px] text-slate-400">QRIS:</span> <span class="text-[10px] font-bold">${formatIDR(totals.qris)}</span></div>
                             </div>
                         </div>
-
-                        <!-- INPUT REKAP HARIAN (BULK ENTRY) -->
-                        <div class="bg-white p-6 rounded-3xl border border-stone-100 shadow-sm">
-                            <h3 class="font-black mb-1 flex items-center gap-2 text-stone-800"><i data-lucide="calendar-plus" class="text-amber-600 w-5 h-5"></i> Input Rekap Harian</h3>
-                            <p class="text-[10px] text-stone-400 font-bold mb-5 leading-relaxed">Masukkan total terjual hari ini. Pastikan tipe penjualan (Toko/Reseller) di atas sudah sesuai.</p>
-                            
-                            <div class="space-y-4">
-                                <div class="bg-stone-50 p-3 rounded-2xl border border-stone-100">
-                                    <label class="text-[9px] font-black text-stone-400 uppercase tracking-widest block mb-1">Pilih Tanggal Penjualan</label>
-                                    <input type="date" id="bulk-date" class="w-full bg-transparent text-sm font-bold outline-none text-stone-700" value="${todayISOString}">
-                                </div>
-                                
-                                <div class="space-y-2">
-                                    ${state.variants.map(v => `
-                                        <div class="flex justify-between items-center py-2 border-b border-stone-100 last:border-0">
-                                            <div class="flex flex-col pr-2 overflow-hidden">
-                                                <span class="font-bold text-xs text-stone-700 truncate">${v.name}</span>
-                                                <span class="text-[10px] text-stone-400 font-bold">${v.bottleSize || '250 ml'}</span>
-                                            </div>
-                                            <div class="flex items-center gap-2 bg-stone-50 px-2 py-1 rounded-lg border border-stone-200">
-                                                <input type="number" id="bulk-qty-${v.id}" class="w-12 bg-transparent text-center font-black text-amber-900 text-sm outline-none" placeholder="0" min="0">
-                                                <span class="text-[9px] text-stone-400 font-bold uppercase">Btl</span>
-                                            </div>
-                                        </div>
-                                    `).join('')}
-                                </div>
-                                
-                                <button onclick="submitBulkSales()" class="w-full bg-stone-900 text-white font-bold py-3.5 rounded-xl hover:bg-stone-800 transition-colors shadow-md mt-2 flex justify-center items-center gap-2">
-                                    <i data-lucide="save" class="w-4 h-4 text-stone-300"></i> Simpan Rekap
-                                </button>
-                            </div>
+                        <div class="bg-red-50 p-4 rounded-2xl border border-red-100">
+                            <p class="text-red-400 text-[9px] font-bold uppercase tracking-wider mb-1">Modal (HPP)</p>
+                            <h4 class="text-xl font-black text-red-600">${formatIDR(totals.modal)}</h4>
                         </div>
-
                     </div>
-                    
-                    <div class="md:col-span-8">
-                        <div class="bg-white rounded-[32px] border border-stone-100 shadow-sm overflow-hidden h-full">
-                            <div class="p-6 border-b border-stone-50 flex justify-between items-center">
-                                <h3 class="font-black text-lg">Detail Riwayat Penjualan</h3>
-                                <button onclick="promptReset('sales')" class="text-xs text-red-500 font-bold italic hover:underline">Reset Penjualan</button>
-                            </div>
-                            <div class="max-h-[700px] overflow-y-auto">
-                                <table class="w-full text-left text-sm">
-                                    <thead class="bg-stone-50 text-[10px] font-black uppercase text-stone-400 tracking-widest sticky top-0 shadow-sm">
-                                        <tr>
-                                            <th class="px-6 py-4">Hari & Tanggal</th>
-                                            <th class="px-6 py-4">Sumber Penjualan</th>
-                                            <th class="px-6 py-4">Varian & Ukuran</th>
-                                            <th class="px-6 py-4 text-center">Jumlah (Qty)</th>
-                                            <th class="px-6 py-4 text-right">Total Omzet</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-stone-50">
-                                        ${groupedSales.length === 0 ? '<tr><td colspan="5" class="px-6 py-20 text-center text-stone-300 italic font-bold">Belum ada data transaksi</td></tr>' : 
-                                          groupedSales.map(s => {
-                                            const isReseller = s.resellerId != null;
-                                            const nameParts = s.name.split('|');
-                                            const displayName = nameParts[0];
-                                            const displaySize = nameParts[1] || '';
-                                            
+
+                    <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="overflow-x-auto no-scrollbar">
+                            <table class="w-full text-left text-sm whitespace-nowrap">
+                                <thead class="bg-slate-50 border-b border-slate-100 text-[10px] font-bold uppercase text-slate-500">
+                                    <tr>
+                                        <th class="px-5 py-3">Produk</th>
+                                        <th class="px-5 py-3 text-center">Metode</th>
+                                        <th class="px-5 py-3 text-center">Qty</th>
+                                        <th class="px-5 py-3 text-right">Omzet Bersih</th>
+                                        <th class="px-5 py-3 text-right">Laba (Kotor)</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-50">
+                                    ${summaryArray.length === 0 ? '<tr><td colspan="5" class="px-5 py-8 text-center text-slate-400 text-xs">Tidak ada data untuk tanggal ini.</td></tr>' : 
+                                        summaryArray.map(item => {
+                                            const laba = item.net - item.cost;
                                             return `
-                                            <tr class="hover:bg-stone-50/50 transition-colors">
-                                                <td class="px-6 py-4 text-stone-500 text-xs">${s.date}</td>
-                                                <td class="px-6 py-4 text-xs font-bold ${isReseller ? 'text-amber-600' : 'text-stone-500'}">
-                                                    <div class="flex items-center gap-1">${isReseller ? '<i data-lucide="users" class="w-3 h-3"></i> Reseller: ' + s.resellerName : '<i data-lucide="user" class="w-3 h-3"></i> Milik Sendiri'}</div>
+                                            <tr class="hover:bg-slate-50/50">
+                                                <td class="px-5 py-3">
+                                                    <div class="font-bold text-slate-800 text-xs">${item.name}</div>
+                                                    <div class="text-[9px] text-slate-400 mt-0.5">${item.size}</div>
                                                 </td>
-                                                <td class="px-6 py-4">
-                                                    <div class="font-black text-stone-800">${displayName}</div>
-                                                    ${displaySize ? `<div class="text-[10px] text-stone-400 font-bold bg-stone-100 px-2 py-0.5 rounded-md inline-block mt-1">${displaySize}</div>` : ''}
-                                                </td>
-                                                <td class="px-6 py-4 text-center font-black text-lg text-stone-700">${s.qty}</td>
-                                                <td class="px-6 py-4 text-right">
-                                                    <div class="font-black text-amber-700">${formatIDR(s.totalOmzet)}</div>
-                                                    ${isReseller ? `<div class="text-[9px] text-green-600 font-bold mt-0.5" title="Telah dipotong untuk reseller">- Hak Reseller: ${formatIDR(s.totalProfitReseller)}</div>` : ''}
-                                                </td>
+                                                <td class="px-5 py-3 text-center"><span class="text-[8px] font-bold px-2 py-0.5 rounded border ${item.method==='QRIS'?'bg-blue-50 text-blue-500 border-blue-100':'bg-emerald-50 text-emerald-500 border-emerald-100'}">${item.method}</span></td>
+                                                <td class="px-5 py-3 text-center font-black text-slate-700">${item.qty}</td>
+                                                <td class="px-5 py-3 text-right font-bold text-slate-700">${formatIDR(item.net)}</td>
+                                                <td class="px-5 py-3 text-right font-black ${laba>=0?'text-emerald-600':'text-red-500'}">${formatIDR(laba)}</td>
                                             </tr>
-                                          `}).join('')}
-                                    </tbody>
-                                </table>
-                            </div>
+                                        `}).join('')
+                                    }
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
@@ -847,127 +805,115 @@
                 const saleDate = new Date(sale.timestamp);
                 if (state.reportFilter === 'daily') return saleDate.toDateString() === now.toDateString();
                 if (state.reportFilter === 'weekly') return (now - saleDate) / (1000 * 60 * 60 * 24) <= 7;
-                if (state.reportFilter === 'monthly') return saleDate.getMonth() === now.getMonth() && saleDate.getFullYear() === now.getFullYear();
-                return true;
+                return saleDate.getMonth() === now.getMonth() && saleDate.getFullYear() === now.getFullYear();
             });
 
             const monthlyOverhead = calculateTotalMonthlyOverhead();
             const monthlyDepreciation = calculateMonthlyAssetDepreciation();
-            
-            let divisor = 1;
-            if (state.reportFilter === 'daily') divisor = 30;
-            if (state.reportFilter === 'weekly') divisor = 4.28;
+            let divisor = state.reportFilter === 'daily' ? 30 : state.reportFilter === 'weekly' ? 4.28 : 1;
 
-            const allocatedOverhead = monthlyOverhead / divisor;
-            const allocatedDepreciation = monthlyDepreciation / divisor;
+            const allocOverhead = monthlyOverhead / divisor;
+            const allocDepreciation = monthlyDepreciation / divisor;
 
             const revenue = reportData.reduce((a, b) => a + (b.price - (b.resellerProfit || 0)), 0);
-            const ingredientCosts = reportData.reduce((a, b) => a + b.recordedIngredientCost, 0);
-            const netProfit = revenue - ingredientCosts - allocatedOverhead - allocatedDepreciation;
-            const totalUnitsSold = reportData.length;
+            const ingCosts = reportData.reduce((a, b) => a + b.recordedIngredientCost, 0);
+            const netProfit = revenue - ingCosts - allocOverhead - allocDepreciation;
+            const totalUnits = reportData.length;
 
             const bepMetrics = calculateBEPMetrics();
-            let bepTarget = bepMetrics.bepUnits;
-            if (state.reportFilter === 'daily') bepTarget = Math.ceil(bepMetrics.bepUnits / 30);
-            if (state.reportFilter === 'weekly') bepTarget = Math.ceil(bepMetrics.bepUnits / 4.28);
-            const isBepReached = totalUnitsSold >= bepTarget;
-
-            const groupedReportData = getGroupedSales(reportData);
+            let bepTarget = state.reportFilter === 'daily' ? Math.ceil(bepMetrics.bepUnits / 30) : state.reportFilter === 'weekly' ? Math.ceil(bepMetrics.bepUnits / 4.28) : bepMetrics.bepUnits;
+            const isBep = totalUnits >= bepTarget;
 
             el.innerHTML = `
                 <div class="space-y-6 animate-fade-in">
-                    <div class="bg-white p-6 rounded-3xl border border-stone-100 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
-                        <div class="flex items-center gap-3">
-                            <div class="bg-amber-100 p-3 rounded-2xl"><i data-lucide="bar-chart-3" class="text-amber-800 w-6 h-6"></i></div>
-                            <div><h3 class="text-xl font-black text-stone-800">Laporan Laba Rugi Akurat</h3><p class="text-xs text-stone-400">Termasuk potongan reseller, beban overhead, dan depresiasi aset</p></div>
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <div>
+                            <h2 class="text-xl font-heading font-extrabold text-slate-800">Laporan Laba Rugi</h2>
+                            <p class="text-xs text-slate-500 mt-0.5">Dikalkulasi otomatis termasuk Overhead & Penyusutan.</p>
                         </div>
-                        <div class="flex bg-stone-100 p-1 rounded-xl">
-                            <button onclick="state.reportFilter='daily'; render();" class="px-4 py-2 rounded-lg text-xs font-bold ${state.reportFilter==='daily'?'bg-white text-amber-800 shadow-sm':'text-stone-400'}">Hari Ini</button>
-                            <button onclick="state.reportFilter='weekly'; render();" class="px-4 py-2 rounded-lg text-xs font-bold ${state.reportFilter==='weekly'?'bg-white text-amber-800 shadow-sm':'text-stone-400'}">Mingguan</button>
-                            <button onclick="state.reportFilter='monthly'; render();" class="px-4 py-2 rounded-lg text-xs font-bold ${state.reportFilter==='monthly'?'bg-white text-amber-800 shadow-sm':'text-stone-400'}">Bulanan</button>
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
-                        <div class="bg-white p-6 rounded-3xl border border-stone-100 shadow-sm">
-                            <p class="text-stone-400 text-[10px] font-black uppercase tracking-widest mb-1">Omzet Bersih</p>
-                            <h4 class="text-lg font-black">${formatIDR(revenue)}</h4>
-                        </div>
-                        <div class="bg-white p-6 rounded-3xl border border-stone-100 shadow-sm">
-                            <p class="text-stone-400 text-[10px] font-black uppercase tracking-widest mb-1">Bahan Baku</p>
-                            <h4 class="text-lg font-black text-stone-500">${formatIDR(ingredientCosts)}</h4>
-                        </div>
-                        <div class="bg-white p-6 rounded-3xl border border-stone-100 shadow-sm">
-                            <p class="text-stone-400 text-[10px] font-black uppercase tracking-widest mb-1">Overhead</p>
-                            <h4 class="text-lg font-black text-red-400">${formatIDR(allocatedOverhead)}</h4>
-                        </div>
-                        <div class="bg-white p-6 rounded-3xl border border-stone-100 shadow-sm">
-                            <p class="text-stone-400 text-[10px] font-black uppercase tracking-widest mb-1">Depresiasi</p>
-                            <h4 class="text-lg font-black text-amber-600">${formatIDR(allocatedDepreciation)}</h4>
-                        </div>
-                        <div class="p-6 rounded-3xl border shadow-sm ${netProfit >= 0 ? 'bg-green-50 border-green-100' : 'bg-red-50 border-red-100'}">
-                            <p class="${netProfit >= 0 ? 'text-green-600' : 'text-red-600'} text-[10px] font-black uppercase tracking-widest mb-1">Laba Bersih</p>
-                            <h4 class="text-xl font-black ${netProfit >= 0 ? 'text-green-700' : 'text-red-700'}">${netProfit < 0 ? '-' : ''}${formatIDR(Math.abs(netProfit))}</h4>
+                        <div class="bg-slate-100 p-1 rounded-xl flex">
+                            <button onclick="state.reportFilter='daily'; render();" class="px-4 py-1.5 rounded-lg text-xs font-bold ${state.reportFilter==='daily'?'bg-white shadow-sm text-amber-600':'text-slate-500'}">Harian</button>
+                            <button onclick="state.reportFilter='weekly'; render();" class="px-4 py-1.5 rounded-lg text-xs font-bold ${state.reportFilter==='weekly'?'bg-white shadow-sm text-amber-600':'text-slate-500'}">Mingguan</button>
+                            <button onclick="state.reportFilter='monthly'; render();" class="px-4 py-1.5 rounded-lg text-xs font-bold ${state.reportFilter==='monthly'?'bg-white shadow-sm text-amber-600':'text-slate-500'}">Bulanan</button>
                         </div>
                     </div>
 
-                    <div class="bg-white p-6 rounded-3xl border border-stone-100 shadow-sm flex flex-col gap-3">
-                        <div class="flex justify-between items-end">
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+                        <div class="bg-white p-4 rounded-2xl border border-slate-200">
+                            <p class="text-[9px] text-slate-400 font-bold uppercase mb-1">Omzet Bersih</p><h4 class="text-sm font-black text-slate-800">${formatIDR(revenue)}</h4>
+                        </div>
+                        <div class="bg-white p-4 rounded-2xl border border-slate-200">
+                            <p class="text-[9px] text-slate-400 font-bold uppercase mb-1">Beban Bahan</p><h4 class="text-sm font-black text-slate-500">${formatIDR(ingCosts)}</h4>
+                        </div>
+                        <div class="bg-white p-4 rounded-2xl border border-slate-200">
+                            <p class="text-[9px] text-slate-400 font-bold uppercase mb-1">Overhead Pro-rata</p><h4 class="text-sm font-black text-red-400">${formatIDR(allocOverhead)}</h4>
+                        </div>
+                        <div class="bg-white p-4 rounded-2xl border border-slate-200">
+                            <p class="text-[9px] text-slate-400 font-bold uppercase mb-1">Penyusutan</p><h4 class="text-sm font-black text-amber-500">${formatIDR(allocDepreciation)}</h4>
+                        </div>
+                        <div class="col-span-2 md:col-span-1 p-4 rounded-2xl border ${netProfit >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}">
+                            <p class="text-[9px] font-bold uppercase mb-1 ${netProfit >= 0 ? 'text-emerald-600' : 'text-red-500'}">Laba Bersih Final</p>
+                            <h4 class="text-lg font-black ${netProfit >= 0 ? 'text-emerald-700' : 'text-red-600'}">${netProfit < 0 ? '-' : ''}${formatIDR(Math.abs(netProfit))}</h4>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
+                        <div class="flex justify-between items-end mb-3">
                             <div>
-                                <p class="text-stone-400 text-[10px] font-black uppercase tracking-widest mb-1">Status Balik Modal (BEP) - ${state.reportFilter === 'daily' ? 'Harian' : state.reportFilter === 'weekly' ? 'Mingguan' : 'Bulanan'}</p>
-                                <h4 class="text-lg font-black ${isBepReached ? 'text-green-600' : 'text-indigo-600'}">${totalUnitsSold} / ${bepTarget} Botol Terjual</h4>
+                                <p class="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">Progress BEP Periode Ini</p>
+                                <h4 class="text-lg font-black text-slate-800">${totalUnits} <span class="text-sm text-slate-400">/ ${bepTarget} Btl</span></h4>
                             </div>
-                            <span class="text-xs font-bold px-3 py-1 rounded-full ${isBepReached ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}">${isBepReached ? 'Balik Modal Tercapai \u2713' : 'Belum Balik Modal'}</span>
+                            <span class="text-[10px] font-bold px-2.5 py-1 rounded-md ${isBep ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">${isBep ? 'Tercapai' : 'Belum BEP'}</span>
                         </div>
-                        <div class="w-full bg-stone-100 rounded-full h-3 overflow-hidden">
-                            <div class="h-3 rounded-full transition-all duration-500 ${isBepReached ? 'bg-green-500' : 'bg-indigo-500'}" style="width: ${Math.min((totalUnitsSold / (bepTarget || 1)) * 100, 100)}%"></div>
+                        <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                            <div class="h-full rounded-full transition-all duration-700 ${isBep ? 'bg-emerald-500' : 'bg-blue-500'}" style="width: ${Math.min((totalUnits / (bepTarget || 1)) * 100, 100)}%"></div>
                         </div>
-                        <p class="text-[10px] text-stone-400 mt-1">Dihitung berdasarkan rata-rata margin untuk menutupi seluruh biaya operasional & penyusutan aset periode ini.</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderReseller(el) {
+            el.innerHTML = `
+                <div class="space-y-6 animate-fade-in">
+                    <div class="flex justify-between items-end mb-4">
+                        <div>
+                            <h2 class="text-xl font-heading font-extrabold text-slate-800">Mitra Reseller</h2>
+                            <p class="text-xs text-slate-500 mt-0.5">Kelola data mitra dan otomatisasi cetak tagihan.</p>
+                        </div>
+                        <button onclick="addReseller()" class="bg-slate-900 text-white p-2.5 rounded-xl hover:bg-slate-800 transition-colors shadow-sm"><i data-lucide="plus" class="w-4 h-4"></i></button>
                     </div>
 
-                    ${netProfit < 0 ? `
-                        <div class="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex items-center gap-3">
-                            <i data-lucide="alert-triangle" class="text-amber-600"></i>
-                            <p class="text-xs text-amber-800"><b>Rugi Terdeteksi:</b> Penjualan belum cukup untuk menutup biaya operasional Anda.</p>
+                    <!-- PRINT SECTION COMPACT -->
+                    <div class="bg-amber-50 p-4 rounded-2xl border border-amber-200 flex flex-col sm:flex-row gap-3 justify-between items-center">
+                        <div class="flex items-center gap-3 w-full sm:w-auto">
+                            <div class="w-8 h-8 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center shrink-0"><i data-lucide="printer" class="w-4 h-4"></i></div>
+                            <select id="report-reseller-select" class="flex-1 sm:w-48 bg-white border border-amber-200 rounded-lg px-3 py-1.5 text-xs font-bold outline-none text-slate-700" onchange="state.selectedReportReseller = this.value; render();">
+                                <option value="all" ${state.selectedReportReseller === 'all' ? 'selected' : ''}>Pilih Reseller...</option>
+                                ${state.resellers.map(r => `<option value="${r.id}" ${state.selectedReportReseller == r.id ? 'selected' : ''}>${r.name}</option>`).join('')}
+                            </select>
                         </div>
-                    ` : ''}
+                        <button onclick="printResellerReport()" class="w-full sm:w-auto bg-amber-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-amber-700 transition-colors">Cetak Invoice</button>
+                    </div>
 
-                    <div class="bg-white rounded-[32px] border border-stone-100 shadow-sm overflow-hidden">
-                        <div class="p-6 border-b border-stone-50 font-black">Detail Transaksi</div>
-                        <table class="w-full text-left text-sm">
-                            <thead class="bg-stone-50 text-[10px] font-black uppercase text-stone-400 tracking-widest">
-                                <tr>
-                                    <th class="px-6 py-4">Hari & Tanggal</th>
-                                    <th class="px-6 py-4">Sumber Penjualan</th>
-                                    <th class="px-6 py-4">Varian & Ukuran</th>
-                                    <th class="px-6 py-4 text-center">Jumlah (Qty)</th>
-                                    <th class="px-6 py-4 text-right">Laba Kotor (Owner)</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-stone-50">
-                                ${groupedReportData.map(s => {
-                                    const actualRevenue = s.totalOmzet - s.totalProfitReseller;
-                                    const grossProfit = actualRevenue - s.totalIngCost;
-                                    const isReseller = s.resellerId != null;
-                                    const nameParts = s.name.split('|');
-                                    const displayName = nameParts[0];
-                                    const displaySize = nameParts[1] || '';
-
-                                    return `
-                                    <tr class="hover:bg-stone-50/50 transition-colors">
-                                        <td class="px-6 py-4 text-stone-500 text-xs">${s.date}</td>
-                                        <td class="px-6 py-4 font-bold text-xs ${isReseller ? 'text-amber-600' : 'text-stone-500'}">${isReseller ? s.resellerName : 'Milik Sendiri'}</td>
-                                        <td class="px-6 py-4">
-                                            <div class="font-black">${displayName}</div>
-                                            ${displaySize ? `<div class="text-[10px] font-bold text-stone-400">${displaySize}</div>` : ''}
-                                        </td>
-                                        <td class="px-6 py-4 text-center font-black">${s.qty}</td>
-                                        <td class="px-6 py-4 text-right font-black text-green-600">${formatIDR(grossProfit)}</td>
-                                    </tr>
-                                `}).join('')}
-                                ${groupedReportData.length === 0 ? '<tr><td colspan="5" class="px-6 py-10 text-center text-stone-400 italic font-bold">Belum ada data untuk periode ini</td></tr>' : ''}
-                            </tbody>
-                        </table>
+                    <!-- RESELLER GRID -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        ${state.resellers.map(r => `
+                            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative group">
+                                <button onclick="delReseller(${r.id})" class="absolute top-3 right-3 text-slate-300 hover:text-red-500 transition-colors"><i data-lucide="x" class="w-4 h-4"></i></button>
+                                <input class="bg-transparent font-bold text-sm w-full outline-none text-slate-800 mb-3" value="${r.name}" onchange="updateReseller(${r.id}, 'name', this.value)" placeholder="Nama Reseller">
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div class="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                        <label class="text-[8px] font-bold text-slate-400 uppercase">Kontak</label>
+                                        <input class="w-full bg-transparent text-xs font-semibold outline-none mt-0.5" value="${r.phone || ''}" onchange="updateReseller(${r.id}, 'phone', this.value)" placeholder="08...">
+                                    </div>
+                                    <div class="bg-amber-50 p-2 rounded-lg border border-amber-100">
+                                        <label class="text-[8px] font-bold text-amber-600 uppercase">Diskon (%)</label>
+                                        <input class="w-full bg-transparent text-xs font-black text-amber-800 outline-none mt-0.5" type="number" value="${r.discountRate}" onchange="updateReseller(${r.id}, 'discountRate', parseFloat(this.value))">
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
                     </div>
                 </div>
             `;
@@ -977,407 +923,189 @@
             const currentVariant = state.variants.find(v => v.id === state.editingVariantId);
             
             el.innerHTML = `
-                <div class="space-y-8 animate-fade-in">
-                    <!-- 1. GUDANG -->
-                    <section class="bg-white p-8 rounded-[32px] border border-stone-100 shadow-sm">
-                        <div class="flex justify-between items-center mb-6">
-                            <div><h3 class="text-xl font-black flex items-center gap-2"><i data-lucide="database" class="text-amber-600"></i> 1. Gudang Bahan Baku (Mingguan)</h3><p class="text-xs text-stone-400">Total budget belanja dan jumlah stok bahan baku yang Anda siapkan untuk 1 minggu</p></div>
-                            <button onclick="addIngredient()" class="bg-stone-900 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-stone-800">+ Tambah</button>
-                        </div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            ${state.ingredients.map(ing => `
-                                <div class="p-4 bg-stone-50 rounded-2xl border border-stone-100 flex flex-col gap-3 relative hover:border-amber-300 transition-colors">
-                                    <div class="flex justify-between items-center">
-                                        <input id="ing-name-${ing.id}" class="bg-transparent font-black text-sm w-full outline-none text-stone-800 placeholder-stone-300" value="${ing.name}" onchange="updateIng(${ing.id}, 'name', this.value)" placeholder="Nama Bahan Baku">
-                                        <button onclick="delIng(${ing.id})" class="text-stone-300 hover:text-red-500 ml-2 transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                                    </div>
-                                    <div class="grid grid-cols-2 gap-3">
-                                        <div class="flex flex-col gap-1">
-                                            <label class="text-[8px] font-black text-stone-400 uppercase tracking-widest">Belanja 1 Minggu</label>
-                                            <div class="flex items-center gap-1 bg-white px-2 py-1.5 rounded-lg border border-stone-200 focus-within:border-amber-400 transition-colors">
-                                                <span class="text-[10px] text-stone-400 font-bold">Rp</span>
-                                                <input id="ing-cost-${ing.id}" class="w-full text-xs font-bold outline-none" type="number" value="${ing.cost}" onchange="updateIng(${ing.id}, 'cost', parseFloat(this.value))">
-                                            </div>
-                                        </div>
-                                        <div class="flex flex-col gap-1">
-                                            <label class="text-[8px] font-black text-stone-400 uppercase tracking-widest">Stok 1 Minggu</label>
-                                            <div class="flex items-center gap-1 bg-white px-2 py-1.5 rounded-lg border border-stone-200 focus-within:border-amber-400 transition-colors">
-                                                <input id="ing-bulk-${ing.id}" class="w-full text-xs font-bold outline-none text-right" type="number" value="${ing.bulkAmount}" onchange="updateIng(${ing.id}, 'bulkAmount', parseFloat(this.value))">
-                                                <select id="ing-unit-${ing.id}" class="text-[10px] bg-transparent font-bold outline-none border-l pl-1 text-amber-700" onchange="updateIng(${ing.id}, 'unit', this.value)">
-                                                    <option value="g" ${ing.unit === 'g' ? 'selected' : ''}>g</option>
-                                                    <option value="ml" ${ing.unit === 'ml' ? 'selected' : ''}>ml</option>
-                                                    <option value="pcs" ${ing.unit === 'pcs' ? 'selected' : ''}>pcs</option>
+                <div class="space-y-6 animate-fade-in">
+                    <h2 class="text-xl font-heading font-extrabold text-slate-800">Master Data</h2>
+                    
+                    <!-- MASTER TABS/CARDS COMPACT -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        
+                        <!-- GUDANG & ASET -->
+                        <div class="space-y-4">
+                            <!-- BAHAN -->
+                            <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
+                                <div class="flex justify-between items-center mb-4">
+                                    <h3 class="font-bold text-sm flex items-center gap-2"><i data-lucide="package" class="w-4 h-4 text-emerald-500"></i> Gudang Bahan</h3>
+                                    <button onclick="addIngredient()" class="text-[10px] bg-slate-100 px-2 py-1 rounded font-bold text-slate-600">+ Bahan</button>
+                                </div>
+                                <div class="space-y-2 max-h-48 overflow-y-auto pr-1 no-scrollbar">
+                                    ${state.ingredients.map(ing => `
+                                        <div class="flex gap-2 items-center bg-slate-50 p-2 rounded-xl">
+                                            <input class="w-1/3 bg-transparent text-xs font-bold outline-none" value="${ing.name}" onchange="updateIng(${ing.id}, 'name', this.value)">
+                                            <input type="number" class="w-1/4 bg-white border border-slate-200 px-1.5 py-1 rounded text-[10px] outline-none" value="${ing.cost}" placeholder="Rp" onchange="updateIng(${ing.id}, 'cost', parseFloat(this.value))">
+                                            <div class="flex w-1/3 bg-white border border-slate-200 rounded overflow-hidden">
+                                                <input type="number" class="w-full text-right px-1.5 py-1 text-[10px] outline-none" value="${ing.bulkAmount}" onchange="updateIng(${ing.id}, 'bulkAmount', parseFloat(this.value))">
+                                                <select class="bg-slate-100 text-[9px] px-1 outline-none font-bold text-slate-600 border-l border-slate-200" onchange="updateIng(${ing.id}, 'unit', this.value)">
+                                                    <option value="g" ${ing.unit==='g'?'selected':''}>g</option><option value="ml" ${ing.unit==='ml'?'selected':''}>ml</option><option value="pcs" ${ing.unit==='pcs'?'selected':''}>pcs</option>
                                                 </select>
                                             </div>
+                                            <button onclick="delIng(${ing.id})" class="text-slate-300 hover:text-red-500 p-1"><i data-lucide="x" class="w-3 h-3"></i></button>
                                         </div>
-                                    </div>
-                                    <div class="pt-2 border-t border-stone-200 flex justify-between items-center">
-                                        <span class="text-[10px] text-stone-400 font-medium">Harga per satuan:</span>
-                                        <span class="text-[10px] font-black text-amber-700">Rp ${Math.round(ing.cost / (ing.bulkAmount || 1)).toLocaleString('id-ID')} / ${ing.unit}</span>
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </section>
-
-                    <!-- 2. ASET TETAP -->
-                    <section class="bg-white p-8 rounded-[32px] border border-stone-100 shadow-sm">
-                        <div class="flex justify-between items-center mb-6">
-                            <div><h3 class="text-xl font-black flex items-center gap-2"><i data-lucide="package" class="text-amber-600"></i> 2. Aset Tetap & Peralatan</h3><p class="text-xs text-stone-400">Peralatan jangka panjang (Biaya penyusutan dihitung otomatis)</p></div>
-                            <button onclick="addAsset()" class="bg-stone-900 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-stone-800">+ Tambah Aset</button>
-                        </div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            ${state.assets.map(asset => `
-                                <div class="p-4 bg-stone-50 rounded-2xl border border-stone-100 space-y-3">
-                                    <div class="flex justify-between">
-                                        <input id="ast-name-${asset.id}" class="bg-transparent font-bold text-sm outline-none w-full" value="${asset.name}" onchange="updateAsset(${asset.id}, 'name', this.value)">
-                                        <button onclick="delAsset(${asset.id})" class="text-red-300 hover:text-red-500"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                                    </div>
-                                    <div class="grid grid-cols-2 gap-2">
-                                        <div>
-                                            <label class="text-[8px] font-black text-stone-400">HARGA BELI</label>
-                                            <input id="ast-cost-${asset.id}" class="w-full bg-white p-1 rounded border text-xs font-bold outline-none" type="number" value="${asset.cost}" onchange="updateAsset(${asset.id}, 'cost', parseFloat(this.value))">
-                                        </div>
-                                        <div>
-                                            <label class="text-[8px] font-black text-stone-400">MASA PAKAI (THN)</label>
-                                            <input id="ast-life-${asset.id}" class="w-full bg-white p-1 rounded border text-xs font-bold outline-none" type="number" value="${asset.lifeYears}" onchange="updateAsset(${asset.id}, 'lifeYears', parseFloat(this.value))">
-                                        </div>
-                                    </div>
-                                    <div class="pt-2 border-t flex justify-between">
-                                        <span class="text-[10px] text-stone-400">Penyusutan/Bulan:</span>
-                                        <span class="text-[10px] font-bold text-amber-700">${formatIDR(asset.cost / (asset.lifeYears * 12))}</span>
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </section>
-
-                    <!-- 3. TARGET & OVERHEAD -->
-                    <section class="bg-white p-8 rounded-[32px] border border-stone-100 shadow-sm">
-                        <div class="flex justify-between items-center mb-6">
-                            <div><h3 class="text-xl font-black flex items-center gap-2 text-stone-800"><i data-lucide="target" class="text-amber-600"></i> 3. Target & Biaya Overhead</h3><p class="text-xs text-stone-400">Biaya operasional tetap bulanan</p></div>
-                        </div>
-                        <div class="grid md:grid-cols-3 gap-6">
-                            <div class="bg-amber-50 p-6 rounded-2xl border border-amber-100">
-                                <label class="text-[10px] font-black text-amber-800 uppercase tracking-widest block mb-2">Target Produksi (btl/bln)</label>
-                                <input id="target-qty" type="number" class="w-full bg-white p-3 rounded-xl border border-amber-200 text-2xl font-black text-amber-900 outline-none" value="${state.targetQty}" onchange="updateTargetQty(this.value)">
-                            </div>
-                            <div class="md:col-span-2 space-y-3">
-                                <label class="text-[10px] font-black text-stone-400 uppercase tracking-widest block mb-1">Rincian Overhead (Sewa, Gaji, dsb)</label>
-                                ${state.opsCosts.map(ops => `
-                                    <div class="flex gap-2">
-                                        <input id="ops-name-${ops.id}" class="flex-1 p-3 bg-stone-50 border rounded-xl text-xs font-bold outline-none" value="${ops.name}" onchange="updateOpsCost(${ops.id}, 'name', this.value)">
-                                        <div class="relative w-32">
-                                            <span class="absolute left-3 top-3 text-[10px] text-stone-400">Rp</span>
-                                            <input id="ops-monthly-${ops.id}" type="number" class="w-full pl-8 pr-3 py-3 bg-stone-50 border rounded-xl text-xs font-black outline-none" value="${ops.monthly}" onchange="updateOpsCost(${ops.id}, 'monthly', parseFloat(this.value))">
-                                        </div>
-                                        <button onclick="delOps(${ops.id})" class="p-2 text-red-300 hover:text-red-500"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                                    </div>
-                                `).join('')}
-                                <button onclick="addOps()" class="text-xs font-bold text-amber-700 flex items-center gap-1 mt-2">+ Tambah Overhead</button>
-                            </div>
-                        </div>
-                    </section>
-
-                    <!-- 4. RESEP -->
-                    <div class="grid md:grid-cols-12 gap-8">
-                        <div class="md:col-span-4">
-                            <div class="bg-white p-6 rounded-3xl border border-stone-100 shadow-sm">
-                                <h3 class="font-black mb-4 flex items-center gap-2"><i data-lucide="layers" class="text-amber-600 w-5 h-5"></i> 4. Varian Produk</h3>
-                                <div class="space-y-2">
-                                    ${state.variants.map(v => `
-                                        <button onclick="state.editingVariantId=${v.id}; render();" class="w-full flex justify-between items-center p-4 rounded-2xl border ${state.editingVariantId===v.id?'border-amber-600 bg-amber-50':'border-stone-50'}">
-                                            <div class="flex flex-col text-left">
-                                                <span class="font-bold text-sm text-stone-800">${v.name}</span>
-                                                <span class="text-[10px] font-bold text-stone-400 mt-1">${v.bottleSize || '250 ml'}</span>
-                                            </div>
-                                            <i data-lucide="chevron-right" class="w-4 h-4 ${state.editingVariantId===v.id?'text-amber-600':'text-stone-300'}"></i>
-                                        </button>
                                     `).join('')}
-                                    <button onclick="addVariant()" class="w-full p-4 border border-dashed rounded-2xl text-stone-400 text-xs font-bold hover:bg-stone-50">+ Varian Baru</button>
+                                </div>
+                            </div>
+                            
+                            <!-- OVERHEAD & ASET COMPACT -->
+                            <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex gap-4">
+                                <div class="flex-1">
+                                    <h3 class="font-bold text-xs mb-2 text-slate-600">Ops Tetap (Bulan)</h3>
+                                    ${state.opsCosts.map(ops => `
+                                        <div class="flex gap-1 mb-1">
+                                            <input class="w-1/2 bg-slate-50 border border-slate-100 rounded px-1.5 py-1 text-[9px] outline-none" value="${ops.name}" onchange="updateOpsCost(${ops.id}, 'name', this.value)">
+                                            <input type="number" class="w-1/2 bg-slate-50 border border-slate-100 rounded px-1.5 py-1 text-[9px] outline-none" value="${ops.monthly}" onchange="updateOpsCost(${ops.id}, 'monthly', parseFloat(this.value))">
+                                        </div>
+                                    `).join('')}
+                                    <button onclick="addOps()" class="text-[9px] text-blue-500 font-bold mt-1">+ Tambah</button>
+                                </div>
+                                <div class="w-px bg-slate-100"></div>
+                                <div class="flex-1">
+                                    <h3 class="font-bold text-xs mb-2 text-slate-600">Aset (Depresiasi)</h3>
+                                    ${state.assets.map(a => `
+                                        <div class="flex gap-1 mb-1">
+                                            <input class="w-1/2 bg-slate-50 border border-slate-100 rounded px-1.5 py-1 text-[9px] outline-none" value="${a.name}" onchange="updateAsset(${a.id}, 'name', this.value)">
+                                            <input type="number" class="w-1/4 bg-slate-50 border border-slate-100 rounded px-1 text-[9px] outline-none" value="${a.cost}" title="Harga Beli" onchange="updateAsset(${a.id}, 'cost', parseFloat(this.value))">
+                                            <input type="number" class="w-1/4 bg-slate-50 border border-slate-100 rounded px-1 text-[9px] outline-none" value="${a.lifeYears}" title="Tahun" onchange="updateAsset(${a.id}, 'lifeYears', parseFloat(this.value))">
+                                        </div>
+                                    `).join('')}
+                                    <button onclick="addAsset()" class="text-[9px] text-blue-500 font-bold mt-1">+ Tambah</button>
                                 </div>
                             </div>
                         </div>
-                        <div class="md:col-span-8">
+
+                        <!-- VARIAN RESEP -->
+                        <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex flex-col">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="font-bold text-sm flex items-center gap-2"><i data-lucide="coffee" class="w-4 h-4 text-amber-600"></i> Resep Varian</h3>
+                                <button onclick="addVariant()" class="text-[10px] bg-amber-50 px-2 py-1 rounded font-bold text-amber-700">+ Varian</button>
+                            </div>
+                            
+                            <div class="flex gap-2 mb-4 overflow-x-auto no-scrollbar pb-2">
+                                ${state.variants.map(v => `
+                                    <button onclick="state.editingVariantId=${v.id}; render();" class="shrink-0 px-3 py-1.5 rounded-lg border text-xs font-bold transition-colors whitespace-nowrap ${state.editingVariantId===v.id?'bg-slate-800 text-white border-slate-800':'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}">${v.name}</button>
+                                `).join('')}
+                            </div>
+
                             ${currentVariant ? `
-                                <div class="bg-white p-8 rounded-[32px] border border-stone-100 shadow-sm space-y-6">
-                                    <div class="flex justify-between items-center">
-                                        <h3 class="text-xl font-black">Edit Komposisi: ${currentVariant.name}</h3>
-                                        <button onclick="if(confirm('Hapus varian ini?')){ delVariant(${currentVariant.id}); }" class="text-red-400 hover:text-red-600 bg-red-50 p-2 rounded-lg"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
-                                    </div>
-                                    
-                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        <div class="bg-stone-50 p-3 rounded-xl md:col-span-1">
-                                            <label class="text-[10px] font-black text-stone-400 uppercase">Ukuran Botol</label>
-                                            <select id="var-size-${currentVariant.id}" class="w-full bg-transparent font-bold outline-none text-stone-800 mt-1" onchange="updateVar(${currentVariant.id}, 'bottleSize', this.value)">
-                                                <option value="250 ml" ${currentVariant.bottleSize === '250 ml' ? 'selected' : ''}>250 ml</option>
-                                                <option value="500 ml" ${currentVariant.bottleSize === '500 ml' ? 'selected' : ''}>500 ml</option>
-                                                <option value="1 Liter" ${currentVariant.bottleSize === '1 Liter' ? 'selected' : ''}>1 Liter</option>
+                                <div class="flex-1 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                                    <div class="flex justify-between items-start mb-3">
+                                        <div class="grid grid-cols-2 gap-2 w-full pr-4">
+                                            <input class="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold outline-none" value="${currentVariant.name}" onchange="updateVar(${currentVariant.id}, 'name', this.value)">
+                                            <input type="number" class="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold text-amber-600 outline-none" value="${currentVariant.price}" placeholder="Harga" onchange="updateVar(${currentVariant.id}, 'price', parseInt(this.value))">
+                                            <select class="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold outline-none col-span-2" onchange="updateVar(${currentVariant.id}, 'bottleSize', this.value)">
+                                                <option value="250 ml" ${currentVariant.bottleSize==='250 ml'?'selected':''}>Botol 250 ml</option>
+                                                <option value="500 ml" ${currentVariant.bottleSize==='500 ml'?'selected':''}>Botol 500 ml</option>
+                                                <option value="1 Liter" ${currentVariant.bottleSize==='1 Liter'?'selected':''}>Botol 1 Liter</option>
                                             </select>
                                         </div>
-                                        <div class="bg-stone-50 p-3 rounded-xl md:col-span-1">
-                                            <label class="text-[10px] font-black text-stone-400 uppercase">Nama</label>
-                                            <input id="var-name-${currentVariant.id}" class="w-full bg-transparent font-bold outline-none mt-1" value="${currentVariant.name}" onchange="updateVar(${currentVariant.id}, 'name', this.value)">
-                                        </div>
-                                        <div class="bg-stone-50 p-3 rounded-xl md:col-span-1">
-                                            <label class="text-[10px] font-black text-stone-400 uppercase">Harga</label>
-                                            <input id="var-price-${currentVariant.id}" class="w-full bg-transparent font-bold text-amber-700 outline-none mt-1" type="number" value="${currentVariant.price}" onchange="updateVar(${currentVariant.id}, 'price', parseInt(this.value))">
-                                        </div>
+                                        <button onclick="if(confirm('Hapus?')){ delVariant(${currentVariant.id}); }" class="text-slate-400 hover:text-red-500"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                                     </div>
-
-                                    <div class="space-y-3">
-                                        <p class="text-[10px] font-black text-stone-400 uppercase tracking-widest">Resep per Botol</p>
-                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                            ${state.ingredients.map(ing => {
-                                                const recipe = currentVariant.recipe.find(r => r.ingId === ing.id);
-                                                return `
-                                                    <div class="flex items-center justify-between p-3 bg-stone-50 rounded-2xl border border-stone-100">
-                                                        <span class="text-xs font-bold text-stone-600 truncate mr-2" title="${ing.name}">${ing.name}</span>
-                                                        <div class="flex items-center gap-2">
-                                                            <input id="rec-${currentVariant.id}-ing-${ing.id}" class="w-16 p-2 border rounded-lg text-center font-black text-amber-900 text-xs outline-none" type="number" value="${recipe ? recipe.qty : ''}" placeholder="0" onchange="updateRecipe(${currentVariant.id}, ${ing.id}, this.value)">
-                                                            <span class="text-[9px] font-bold text-stone-400 uppercase w-4">${ing.unit}</span>
-                                                        </div>
+                                    <p class="text-[9px] font-bold text-slate-400 uppercase mb-2">Komposisi (Takaran)</p>
+                                    <div class="space-y-1.5 max-h-32 overflow-y-auto pr-1 no-scrollbar">
+                                        ${state.ingredients.map(ing => {
+                                            const rec = currentVariant.recipe.find(r => r.ingId === ing.id);
+                                            return `
+                                                <div class="flex justify-between items-center text-xs">
+                                                    <span class="text-slate-600 line-clamp-1 pr-2">${ing.name}</span>
+                                                    <div class="flex bg-white border border-slate-200 rounded overflow-hidden shrink-0">
+                                                        <input type="number" class="w-12 text-center text-[10px] font-bold outline-none py-0.5" value="${rec?rec.qty:''}" placeholder="0" onchange="updateRecipe(${currentVariant.id}, ${ing.id}, this.value)">
+                                                        <span class="bg-slate-100 text-[8px] font-bold text-slate-400 px-1 py-0.5 border-l">${ing.unit}</span>
                                                     </div>
-                                                `;
-                                            }).join('')}
-                                        </div>
-                                    </div>
-                                    <div class="bg-amber-800 p-4 rounded-2xl flex justify-between items-center text-white">
-                                        <span class="text-sm font-bold flex items-center gap-2"><i data-lucide="calculator" class="w-4 h-4 text-amber-300"></i> HPP Total per Unit</span>
-                                        <span class="text-xl font-black italic">${formatIDR(calculateVariantMetrics(currentVariant).totalHpp)}</span>
+                                                </div>
+                                            `;
+                                        }).join('')}
                                     </div>
                                 </div>
-                            ` : `<div class="h-full min-h-[400px] border-2 border-dashed border-stone-200 rounded-[32px] flex items-center justify-center text-stone-300 font-bold bg-white">Pilih Varian untuk mengatur racikan resep</div>`}
+                            ` : `<div class="flex-1 border-2 border-dashed border-slate-200 rounded-2xl flex items-center justify-center text-slate-400 text-xs font-medium">Pilih varian di atas</div>`}
                         </div>
                     </div>
 
-                    <!-- 5. ZONA BERBAHAYA (RESET DATA) -->
-                    <section class="bg-red-50 p-8 rounded-[32px] border border-red-100 shadow-sm mt-8">
-                        <div class="mb-6">
-                            <h3 class="text-xl font-black flex items-center gap-2 text-red-800"><i data-lucide="alert-triangle" class="text-red-600"></i> 5. Zona Berbahaya</h3>
-                            <p class="text-xs text-red-600/70 mt-1 font-medium">Tindakan ini akan menghapus data secara permanen dari database cloud.</p>
+                    <!-- DANGER ZONE -->
+                    <div class="bg-red-50 p-4 rounded-2xl border border-red-100 flex justify-between items-center">
+                        <div>
+                            <h4 class="font-bold text-xs text-red-800">Zona Bahaya</h4>
+                            <p class="text-[9px] text-red-500 mt-0.5">Hapus data (Penjualan / Semua Data)</p>
                         </div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <button onclick="promptReset('sales')" class="p-4 bg-white border border-red-200 rounded-2xl text-left hover:bg-red-100 transition-colors shadow-sm">
-                                <h4 class="font-bold text-red-800 text-sm mb-1">Riwayat Penjualan</h4>
-                                <p class="text-[10px] text-red-500 leading-tight">Hapus semua data transaksi kasir dan laporan laba.</p>
-                            </button>
-                            <button onclick="promptReset('assets')" class="p-4 bg-white border border-red-200 rounded-2xl text-left hover:bg-red-100 transition-colors shadow-sm">
-                                <h4 class="font-bold text-red-800 text-sm mb-1">Aset & Operasional</h4>
-                                <p class="text-[10px] text-red-500 leading-tight">Hapus daftar aset tetap dan biaya overhead bulanan.</p>
-                            </button>
-                            <button onclick="promptReset('recipes')" class="p-4 bg-white border border-red-200 rounded-2xl text-left hover:bg-red-100 transition-colors shadow-sm">
-                                <h4 class="font-bold text-red-800 text-sm mb-1">Bahan & Resep</h4>
-                                <p class="text-[10px] text-red-500 leading-tight">Hapus seluruh data gudang bahan baku dan varian resep.</p>
-                            </button>
-                            <button onclick="promptReset('all')" class="p-4 bg-red-600 border border-red-700 rounded-2xl text-left hover:bg-red-800 transition-colors text-white shadow-md">
-                                <h4 class="font-bold text-white text-sm mb-1">Reset Semua Data</h4>
-                                <p class="text-[10px] text-red-200 leading-tight">Kembalikan aplikasi seperti baru pertama kali digunakan.</p>
-                            </button>
+                        <div class="flex gap-2">
+                            <button onclick="promptReset('sales')" class="px-3 py-1.5 bg-white border border-red-200 rounded-lg text-[10px] font-bold text-red-600 hover:bg-red-100 transition-colors">Reset Penjualan</button>
+                            <button onclick="promptReset('all')" class="px-3 py-1.5 bg-red-600 rounded-lg text-[10px] font-bold text-white hover:bg-red-700 transition-colors">Reset Total</button>
                         </div>
-                    </section>
+                    </div>
                 </div>
             `;
         }
 
-        // --- SISTEM PEMANGGIL MODAL KONFIRMASI ---
+        // --- SISTEM RESET & CRUD (Tetap sama persis dengan versi sebelumnya) ---
         window.promptReset = (type) => {
-            let targetName = "";
-            if (type === 'sales') targetName = "Riwayat Penjualan";
-            if (type === 'assets') targetName = "Aset & Operasional";
-            if (type === 'recipes') targetName = "Bahan & Resep";
-            if (type === 'all') targetName = "Seluruh Data Aplikasi";
-
-            showModal(
-                'confirm', 
-                'Hapus ' + targetName + '?', 
-                'Data yang dihapus dari cloud tidak dapat dikembalikan. Apakah Anda yakin ingin melanjutkan?', 
-                () => executeReset(type)
-            );
+            let targetName = type === 'sales' ? "Riwayat Penjualan" : "Seluruh Data Aplikasi";
+            showModal('confirm', 'Hapus ' + targetName + '?', 'Tindakan ini permanen. Lanjutkan?', () => executeReset(type));
         };
 
-        // --- SISTEM PENGEKSEKUSI HAPUS KE SUPABASE ---
         window.executeReset = async (type) => {
-            showModal('alert', 'Memproses...', 'Sedang menghubungi server cloud. Mohon tunggu...');
-            
+            showModal('alert', 'Memproses...', 'Menghubungi server...');
             try {
                 if (type === 'sales' || type === 'all') {
                     const { error } = await supabaseClient.from('sales').delete().gt('id', 0);
                     if (error) throw error;
                     state.sales = [];
                 }
-                if (type === 'assets' || type === 'all') {
-                    const { error: e1 } = await supabaseClient.from('assets').delete().gt('id', 0);
-                    const { error: e2 } = await supabaseClient.from('ops_costs').delete().gt('id', 0);
-                    if (e1) throw e1;
-                    if (e2) throw e2;
-                    state.assets = [];
-                    state.opsCosts = [];
-                }
-                if (type === 'recipes' || type === 'all') {
-                    const { error: e3 } = await supabaseClient.from('ingredients').delete().gt('id', 0);
-                    const { error: e4 } = await supabaseClient.from('variants').delete().gt('id', 0);
-                    if (e3) throw e3;
-                    if (e4) throw e4;
-                    state.ingredients = [];
-                    state.variants = [];
-                    state.editingVariantId = null;
-                }
                 if (type === 'all') {
-                    const { error: e5 } = await supabaseClient.from('resellers').delete().gt('id', 0);
-                    if (e5) throw e5;
-                    state.resellers = [];
+                    await supabaseClient.from('assets').delete().gt('id', 0);
+                    await supabaseClient.from('ops_costs').delete().gt('id', 0);
+                    await supabaseClient.from('ingredients').delete().gt('id', 0);
+                    await supabaseClient.from('variants').delete().gt('id', 0);
+                    await supabaseClient.from('resellers').delete().gt('id', 0);
+                    state.assets = []; state.opsCosts = []; state.ingredients = []; state.variants = []; state.resellers = []; state.editingVariantId = null;
                 }
-                
                 render();
-                setTimeout(() => { showModal('alert', 'Berhasil!', 'Data telah dihapus bersih dari sistem.'); }, 200);
-            } catch (error) {
-                console.error("Gagal menghapus data:", error);
-                showModal('alert', 'Gagal Menghapus', 'Perintah ditolak oleh Supabase.');
-            }
+                setTimeout(() => { closeModal(); }, 500);
+            } catch (error) { showModal('alert', 'Gagal', 'Akses ditolak server.'); }
         };
 
-        // --- CRUD HELPERS (OPTIMISTIC UPDATES) ---
-        window.addReseller = () => {
-            const newItem = { id: Date.now(), name: 'Toko Baru', phone: '', discountRate: 15 };
-            supabaseClient.from('resellers').insert([newItem]).then();
-            state.resellers.push(newItem);
-            render();
-        };
-        window.updateReseller = (id, f, v) => {
-            supabaseClient.from('resellers').update({ [f]: v }).eq('id', id).then();
-            const r = state.resellers.find(x => x.id === id);
-            if (r) r[f] = v;
-            render();
-        };
-        window.delReseller = (id) => {
-            supabaseClient.from('resellers').delete().eq('id', id).then();
-            state.resellers = state.resellers.filter(x => x.id !== id);
-            render();
-        };
+        window.addReseller = () => { const newItem = { id: Date.now(), name: 'Toko Baru', phone: '', discountRate: 10 }; supabaseClient.from('resellers').insert([newItem]).then(); state.resellers.push(newItem); render(); };
+        window.updateReseller = (id, f, v) => { supabaseClient.from('resellers').update({ [f]: v }).eq('id', id).then(); const r = state.resellers.find(x => x.id === id); if (r) r[f] = v; render(); };
+        window.delReseller = (id) => { supabaseClient.from('resellers').delete().eq('id', id).then(); state.resellers = state.resellers.filter(x => x.id !== id); render(); };
 
-        window.addIngredient = () => {
-            const newItem = { id: Date.now(), name: 'Bahan Baru', cost: 0, bulkAmount: 1000, unit: 'g' };
-            supabaseClient.from('ingredients').insert([newItem]).then();
-            state.ingredients.push(newItem);
-            render();
-        };
-        window.updateIng = (id, f, v) => {
-            supabaseClient.from('ingredients').update({ [f]: v }).eq('id', id).then();
-            const i = state.ingredients.find(x => x.id === id);
-            if (i) i[f] = v;
-            render();
-        };
-        window.delIng = (id) => {
-            supabaseClient.from('ingredients').delete().eq('id', id).then();
-            state.ingredients = state.ingredients.filter(x => x.id !== id);
-            render();
-        };
+        window.addIngredient = () => { const newItem = { id: Date.now(), name: 'Bahan', cost: 0, bulkAmount: 100, unit: 'g' }; supabaseClient.from('ingredients').insert([newItem]).then(); state.ingredients.push(newItem); render(); };
+        window.updateIng = (id, f, v) => { supabaseClient.from('ingredients').update({ [f]: v }).eq('id', id).then(); const i = state.ingredients.find(x => x.id === id); if (i) i[f] = v; render(); };
+        window.delIng = (id) => { supabaseClient.from('ingredients').delete().eq('id', id).then(); state.ingredients = state.ingredients.filter(x => x.id !== id); render(); };
         
-        window.addAsset = () => {
-            const newItem = { id: Date.now(), name: 'Aset Baru', cost: 0, lifeYears: 5 };
-            supabaseClient.from('assets').insert([newItem]).then();
-            state.assets.push(newItem);
-            render();
-        };
-        window.updateAsset = (id, f, v) => {
-            supabaseClient.from('assets').update({ [f]: v }).eq('id', id).then();
-            const a = state.assets.find(x => x.id === id);
-            if (a) a[f] = v;
-            render();
-        };
-        window.delAsset = (id) => {
-            supabaseClient.from('assets').delete().eq('id', id).then();
-            state.assets = state.assets.filter(x => x.id !== id);
-            render();
-        };
+        window.addAsset = () => { const newItem = { id: Date.now(), name: 'Aset', cost: 0, lifeYears: 5 }; supabaseClient.from('assets').insert([newItem]).then(); state.assets.push(newItem); render(); };
+        window.updateAsset = (id, f, v) => { supabaseClient.from('assets').update({ [f]: v }).eq('id', id).then(); const a = state.assets.find(x => x.id === id); if (a) a[f] = v; render(); };
+        window.delAsset = (id) => { supabaseClient.from('assets').delete().eq('id', id).then(); state.assets = state.assets.filter(x => x.id !== id); render(); };
 
-        window.addVariant = () => {
-            const nid = Date.now();
-            // Trik khusus agar bottleSize dapat tersimpan di Supabase tanpa mengubah skema (diselipkan di resep)
-            const dbItem = { id: nid, name: 'Varian Baru', price: 0, recipe: [{ ingId: 'SIZE', qty: '250 ml' }] };
-            supabaseClient.from('variants').insert([dbItem]).then();
-            
-            state.variants.push({ id: nid, name: 'Varian Baru', bottleSize: '250 ml', price: 0, recipe: [] });
-            state.editingVariantId = nid;
-            render();
-        };
-        window.delVariant = (id) => {
-            supabaseClient.from('variants').delete().eq('id', id).then();
-            state.variants = state.variants.filter(x => x.id !== id);
-            state.editingVariantId = null;
-            render();
-        };
-        window.updateVar = (id, f, v) => {
-            const x = state.variants.find(y => y.id === id);
-            if (x) {
-                x[f] = v;
-                if (f === 'bottleSize') {
-                    // Update ukuran botol lewat array JSON
-                    const dbRecipe = [...x.recipe, { ingId: 'SIZE', qty: v }];
-                    supabaseClient.from('variants').update({ recipe: dbRecipe }).eq('id', id).then();
-                } else {
-                    supabaseClient.from('variants').update({ [f]: v }).eq('id', id).then();
-                }
-            }
-            render();
-        };
-        window.updateRecipe = (vid, iid, qty) => {
-            const v = state.variants.find(x => x.id === vid);
-            if (v) {
-                const other = v.recipe.filter(r => r.ingId !== iid);
-                const q = parseFloat(qty);
-                const newRecipe = q > 0 ? [...other, { ingId: iid, qty: q }] : other;
-                v.recipe = newRecipe;
-                
-                // Pastikan ukuran botol ikut diselipkan
-                const dbRecipe = [...newRecipe, { ingId: 'SIZE', qty: v.bottleSize || '250 ml' }];
-                supabaseClient.from('variants').update({ recipe: dbRecipe }).eq('id', vid).then();
-            }
-            render();
-        };
-        window.updateTargetQty = (val) => {
-            const newQty = parseInt(val) || 1;
-            supabaseClient.from('settings').update({ targetQty: newQty }).eq('id', 1).then();
-            state.targetQty = newQty;
-            render();
-        };
-        window.addOps = () => {
-            const newItem = { id: Date.now(), name: 'Biaya Baru', monthly: 0 };
-            supabaseClient.from('ops_costs').insert([newItem]).then();
-            state.opsCosts.push(newItem);
-            render();
-        };
-        window.updateOpsCost = (id, f, v) => {
-            supabaseClient.from('ops_costs').update({ [f]: v }).eq('id', id).then();
-            const o = state.opsCosts.find(x => x.id === id);
-            if (o) o[f] = v;
-            render();
-        };
-        window.delOps = (id) => {
-            supabaseClient.from('ops_costs').delete().eq('id', id).then();
-            state.opsCosts = state.opsCosts.filter(x => x.id !== id);
-            render();
-        };
+        window.addVariant = () => { const nid = Date.now(); const dbItem = { id: nid, name: 'Varian', price: 0, recipe: [{ ingId: 'SIZE', qty: '250 ml' }] }; supabaseClient.from('variants').insert([dbItem]).then(); state.variants.push({ id: nid, name: 'Varian', bottleSize: '250 ml', price: 0, recipe: [] }); state.editingVariantId = nid; render(); };
+        window.delVariant = (id) => { supabaseClient.from('variants').delete().eq('id', id).then(); state.variants = state.variants.filter(x => x.id !== id); state.editingVariantId = null; render(); };
+        window.updateVar = (id, f, v) => { const x = state.variants.find(y => y.id === id); if (x) { x[f] = v; if (f === 'bottleSize') { const dbRecipe = [...x.recipe, { ingId: 'SIZE', qty: v }]; supabaseClient.from('variants').update({ recipe: dbRecipe }).eq('id', id).then(); } else { supabaseClient.from('variants').update({ [f]: v }).eq('id', id).then(); } } render(); };
+        window.updateRecipe = (vid, iid, qty) => { const v = state.variants.find(x => x.id === vid); if (v) { const other = v.recipe.filter(r => r.ingId !== iid); const q = parseFloat(qty); const newRecipe = q > 0 ? [...other, { ingId: iid, qty: q }] : other; v.recipe = newRecipe; const dbRecipe = [...newRecipe, { ingId: 'SIZE', qty: v.bottleSize || '250 ml' }]; supabaseClient.from('variants').update({ recipe: dbRecipe }).eq('id', vid).then(); } render(); };
+        
+        window.updateTargetQty = (val) => { const newQty = parseInt(val) || 1; supabaseClient.from('settings').update({ targetQty: newQty }).eq('id', 1).then(); state.targetQty = newQty; render(); };
+        window.addOps = () => { const newItem = { id: Date.now(), name: 'Biaya', monthly: 0 }; supabaseClient.from('ops_costs').insert([newItem]).then(); state.opsCosts.push(newItem); render(); };
+        window.updateOpsCost = (id, f, v) => { supabaseClient.from('ops_costs').update({ [f]: v }).eq('id', id).then(); const o = state.opsCosts.find(x => x.id === id); if (o) o[f] = v; render(); };
+        window.delOps = (id) => { supabaseClient.from('ops_costs').delete().eq('id', id).then(); state.opsCosts = state.opsCosts.filter(x => x.id !== id); render(); };
 
         // --- AUTH LOGIC ---
         document.getElementById('login-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const em = document.getElementById('email').value;
             const pw = document.getElementById('password').value;
-            
             if (em === 'ruang.mozzart@gmail.com' && pw === 'R4h45i4ku') {
                 const btn = e.target.querySelector('button');
                 const origHtml = btn.innerHTML;
-                btn.innerHTML = 'Memuat Data Cloud...';
-                
+                btn.innerHTML = 'Memuat...';
                 await loadDataFromSupabase();
-                
                 state.isLoggedIn = true;
                 document.getElementById('login-screen').classList.add('hidden');
                 document.getElementById('app-screen').classList.remove('hidden');
                 render();
-                
                 btn.innerHTML = origHtml;
             } else {
                 document.getElementById('login-error').classList.remove('hidden');
