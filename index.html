@@ -9,6 +9,7 @@
     
     <!-- Supabase JS Client -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
     <script>
         // Konfigurasi Tema Dinamis Tailwind
         tailwind.config = {
@@ -32,6 +33,7 @@
             }
         }
     </script>
+
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;700;800&display=swap');
         
@@ -64,6 +66,8 @@
             #print-area, #print-area * { visibility: visible; }
             #print-area { position: absolute; left: 0; top: 0; width: 100%; background: white;}
             .no-print { display: none !important; }
+            /* Tambahan untuk menghilangkan margin browser bawaan saat print nota */
+            @page { margin: 0; }
         }
 
         /* Glassmorphism utils */
@@ -179,13 +183,13 @@
             isLoggedIn: false,
             activeTab: 'transaksi', 
             reportFilter: 'daily',
-            reportStartDate: new Date().toISOString().split('T')[0], // Tambahan untuk rentang tanggal
-            reportEndDate: new Date().toISOString().split('T')[0],   // Tambahan untuk rentang tanggal
+            reportStartDate: new Date().toISOString().split('T')[0],
+            reportEndDate: new Date().toISOString().split('T')[0],
             rekapDate: new Date().toISOString().split('T')[0],
             editingVariantId: null,
             selectedSalesChannel: 'direct', 
             selectedPaymentMethod: 'CASH',
-            selectedPaymentStatus: 'LUNAS', // LUNAS atau PIUTANG
+            selectedPaymentStatus: 'LUNAS',
             selectedReportReseller: 'all', 
             ingredients: [],
             assets: [],
@@ -285,7 +289,6 @@
                 return;
             }
 
-            // Template Khusus untuk Edit Penjualan
             if (state.modal.type === 'edit_sale') {
                 const ids = state.modal.data.ids;
                 const refItem = state.sales.find(s => s.id === ids[0]);
@@ -421,9 +424,9 @@
                 // parts[3] adalah status LUNAS/PIUTANG. Default ke LUNAS jika data lama tidak punya status.
                 const status = parts[3] || 'LUNAS'; 
                 
-                const key = `${s.date}_${s.name}_${s.resellerId}_${status}`;
-                // Menambahkan properti "ids" untuk melacak setiap ID di dalam grup
-                if(!map[key]) { map[key] = { ...s, qty: 0, totalOmzet: 0, totalProfitReseller: 0, totalIngCost: 0, ids: [], paymentStatus: status }; }
+                // Group by EXACT transaction timestamp agar nota (receipt) bekerja sesuai per checkout
+                const key = `${s.timestamp}_${s.name}_${s.resellerId}_${status}`;
+                if(!map[key]) { map[key] = { ...s, qty: 0, totalOmzet: 0, totalProfitReseller: 0, totalIngCost: 0, ids: [], paymentStatus: status, timestamp: s.timestamp }; }
                 map[key].qty += 1;
                 map[key].totalOmzet += s.price;
                 map[key].totalProfitReseller += (s.resellerProfit || 0);
@@ -453,7 +456,6 @@
             const variantHPPInfo = calculateVariantMetrics(v);
             const channelInfo = getSalesChannelInfo(v.price);
             
-            // Format name: Nama|Ukuran|Metode|StatusPembayaran
             const fullName = `${v.name}|${v.bottleSize || '250 ml'}|${state.selectedPaymentMethod}|${state.selectedPaymentStatus}`;
             const newSale = {
                 id: Date.now(),
@@ -472,7 +474,6 @@
             render();
         }
 
-        // --- SISTEM UPDATE STATUS PELUNASAN ---
         window.promptMarkAsPaid = (ids) => {
             showModal('confirm', 'Tandai Lunas?', 'Apakah transaksi (atau kumpulan transaksi) ini sudah dibayar lunas?', () => executeMarkAsPaid(ids));
         };
@@ -481,11 +482,10 @@
             showModal('alert', 'Memproses...', 'Menyimpan status pelunasan...');
             try {
                 const updates = [];
-                // Update state lokal
                 state.sales = state.sales.map(s => {
                     if (ids.includes(s.id)) {
                         const parts = s.name.split('|');
-                        parts[3] = 'LUNAS'; // Update index 3 (Status) ke LUNAS
+                        parts[3] = 'LUNAS';
                         const newName = parts.join('|');
                         updates.push({ id: s.id, name: newName });
                         return { ...s, name: newName };
@@ -493,7 +493,6 @@
                     return s;
                 });
 
-                // Update ke database Supabase
                 for (let u of updates) {
                     await supabaseClient.from('sales').update({ name: u.name }).eq('id', u.id);
                 }
@@ -505,7 +504,6 @@
             }
         };
 
-        // --- SISTEM EDIT TRANSAKSI (QTY, METODE, STATUS) ---
         window.promptEditSale = (ids) => {
             state.modal = { isOpen: true, type: 'edit_sale', data: { ids } };
             renderModal();
@@ -535,7 +533,6 @@
                 let currentIds = [...ids];
                 const diff = newQty - currentIds.length;
 
-                // 1. Jika Qty baru lebih kecil (Hapus kelebihan)
                 if (diff < 0) {
                     const idsToDelete = currentIds.slice(newQty); 
                     await supabaseClient.from('sales').delete().in('id', idsToDelete);
@@ -543,7 +540,6 @@
                     currentIds = currentIds.slice(0, newQty);
                 }
 
-                // 2. Jika Qty baru lebih besar (Tambah baru)
                 if (diff > 0) {
                     const newSales = [];
                     for(let i=0; i < diff; i++) {
@@ -563,7 +559,6 @@
                     state.sales = [...newSales, ...state.sales];
                 }
 
-                // 3. Update data yang sudah ada jika Metode/Status berubah
                 if (refItem.name !== newName) {
                     await supabaseClient.from('sales').update({ name: newName }).in('id', currentIds);
                     state.sales = state.sales.map(s => currentIds.includes(s.id) ? { ...s, name: newName } : s);
@@ -578,7 +573,6 @@
             }
         };
 
-        // --- SISTEM HAPUS TRANSAKSI SPESIFIK ---
         window.promptDeleteSale = (saleId) => {
             showModal('confirm', 'Batalkan Transaksi?', 'Tindakan ini akan menghapus 1 data penjualan (yang paling baru) dari item ini. Lanjutkan?', () => executeDeleteSale(saleId));
         };
@@ -597,15 +591,18 @@
             }
         };
 
-        window.submitBulkSales = async () => {
+        window.submitBulkSales = async (shouldPrint = false) => {
             const dateInput = document.getElementById('bulk-date').value;
             const paymentInput = document.getElementById('bulk-payment').value;
             const statusInput = document.getElementById('bulk-status').value;
             if (!dateInput) return showModal('alert', 'Perhatian', 'Pilih tanggal terlebih dahulu.');
 
             const [year, month, day] = dateInput.split('-');
-            const selectedDate = new Date(year, month - 1, day, 12, 0, 0); 
+            const now = new Date();
+            // Buat waktu transaksi unik berdasarkan waktu riil agar grouping Nota akurat
+            const selectedDate = new Date(year, month - 1, day, now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds()); 
             const dateString = selectedDate.toLocaleDateString('id-ID', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+            const transactionTimestamp = selectedDate.toISOString();
 
             let allNewSales = [];
             let totalQty = 0;
@@ -629,10 +626,12 @@
                             resellerId: channelInfo.resellerId,
                             resellerName: channelInfo.resellerName,
                             resellerProfit: channelInfo.resellerProfit,
-                            timestamp: selectedDate.toISOString(),
+                            timestamp: transactionTimestamp,
                             date: dateString
                         });
                     }
+                    // Reset input setelah dikumpulkan
+                    document.getElementById(`bulk-qty-${v.id}`).value = '';
                 }
             });
 
@@ -645,10 +644,107 @@
                 state.sales = [...allNewSales, ...state.sales];
                 state.sales.sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
                 render(); 
-                setTimeout(() => showModal('alert', 'Sukses', `Tersimpan ${totalQty} produk.`), 200);
+                setTimeout(() => {
+                    if(shouldPrint) {
+                        closeModal(); // tutup modal memproses
+                        printNota(transactionTimestamp);
+                    } else {
+                        showModal('alert', 'Sukses', `Tersimpan ${totalQty} produk.`);
+                    }
+                }, 200);
             } catch (error) {
                 showModal('alert', 'Gagal', 'Terjadi kesalahan sistem.');
             }
+        };
+
+        // --- SISTEM CETAK NOTA KASIR ---
+        window.printNota = (timestamp) => {
+            const cartItems = state.sales.filter(s => s.timestamp === timestamp);
+            if (cartItems.length === 0) return showModal('alert', 'Gagal', 'Data transaksi tidak ditemukan.');
+
+            const firstSale = cartItems[0];
+            const isReseller = firstSale.resellerId != null;
+            const customerName = isReseller ? firstSale.resellerName : 'Pelanggan Umum';
+            const dateObj = new Date(firstSale.timestamp);
+            
+            let totalQty = 0;
+            let grandTotal = 0;
+            let itemsMap = {};
+
+            // Gabungkan produk yang sama di dalam satu transaksi
+            cartItems.forEach(s => {
+                const nameParts = s.name.split('|');
+                const itemName = nameParts[0];
+                const itemSize = nameParts[1] || '';
+                const key = `${itemName}_${itemSize}`;
+                
+                if(!itemsMap[key]) {
+                    itemsMap[key] = { name: itemName, size: itemSize, qty: 0, price: s.price - (s.resellerProfit || 0) };
+                }
+                itemsMap[key].qty += 1;
+            });
+
+            let itemsHtml = Object.values(itemsMap).map(item => {
+                const subtotal = item.qty * item.price;
+                totalQty += item.qty;
+                grandTotal += subtotal;
+                return `
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 11px;">
+                        <div style="flex: 1; padding-right: 10px;">
+                            <div style="font-weight: bold; margin-bottom: 2px;">${item.name} ${item.size ? `(${item.size})` : ''}</div>
+                            <div style="color: #444;">${item.qty} x ${formatIDR(item.price)}</div>
+                        </div>
+                        <div style="font-weight: bold; text-align: right; display: flex; align-items: flex-end;">
+                            ${formatIDR(subtotal)}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            const paymentMethod = firstSale.name.split('|')[2] || 'CASH';
+            const paymentStatus = firstSale.name.split('|')[3] || 'LUNAS';
+
+            // Desain CSS Struk Nota Thermal
+            const html = `
+                <div style="width: 58mm; padding: 10px 10px 20px 10px; font-family: 'Courier New', Courier, monospace; color: #000; background: #fff; margin: 0;">
+                    <div style="text-align: center; margin-bottom: 12px;">
+                        <h2 style="margin: 0; font-size: 16px; font-weight: 900; letter-spacing: 0.5px;">MOZZART COFFEE</h2>
+                        <p style="margin: 2px 0 0; font-size: 10px;">Roastery & Cafe</p>
+                    </div>
+                    
+                    <div style="border-bottom: 1px dashed #000; margin-bottom: 10px; padding-bottom: 10px; font-size: 10px;">
+                        <table style="width: 100%; border-spacing: 0;">
+                            <tr><td style="padding-bottom:2px;">Tgl</td><td style="text-align: right; padding-bottom:2px;">${dateObj.toLocaleDateString('id-ID')} ${dateObj.toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'})}</td></tr>
+                            <tr><td style="padding-bottom:2px;">Plg</td><td style="text-align: right; padding-bottom:2px;">${customerName}</td></tr>
+                            <tr><td>Ket</td><td style="text-align: right; font-weight: bold;">${paymentStatus} (${paymentMethod})</td></tr>
+                        </table>
+                    </div>
+
+                    <div style="border-bottom: 1px dashed #000; margin-bottom: 10px; padding-bottom: 6px;">
+                        ${itemsHtml}
+                    </div>
+
+                    <div style="font-size: 11px; margin-bottom: 20px;">
+                        <div style="display: flex; justify-content: space-between; font-weight: 900; font-size: 14px; margin-bottom: 6px;">
+                            <span>TOTAL</span>
+                            <span>${formatIDR(grandTotal)}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; color: #444; font-size: 10px;">
+                            <span>Total Item</span>
+                            <span>${totalQty} btl</span>
+                        </div>
+                    </div>
+
+                    <div style="text-align: center; font-size: 10px;">
+                        <p style="margin: 0; font-weight: bold;">Terima Kasih</p>
+                        <p style="margin: 3px 0 0;">IG: @mozzartcoffee</p>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('print-area').innerHTML = html;
+            window.print();
+            setTimeout(() => { document.getElementById('print-area').innerHTML = ''; }, 1000);
         };
 
         // --- PRINT RESELLER ---
@@ -707,7 +803,6 @@
             setTimeout(() => { document.getElementById('print-area').innerHTML = ''; }, 1000);
         }
 
-        // --- PRINT LAPORAN LABA RUGI ---
         window.printLaporanReport = () => {
             const now = new Date();
             const reportData = state.sales.filter(sale => {
@@ -733,7 +828,6 @@
             const monthlyOverhead = calculateTotalMonthlyOverhead();
             const monthlyDepreciation = calculateMonthlyAssetDepreciation();
             
-            // Kalkulasi proporsional hari untuk biaya tetap
             let daysCount = 1;
             if (state.reportFilter === 'daily') daysCount = 1;
             else if (state.reportFilter === 'weekly') daysCount = 7;
@@ -751,7 +845,6 @@
             const ingCosts = reportData.reduce((a, b) => a + b.recordedIngredientCost, 0);
             const netProfit = revenue - ingCosts - allocOverhead - allocDepreciation;
 
-            // Grouping data produk untuk tabel ringkasan
             let summary = {};
             reportData.forEach(s => {
                 const nameParts = s.name.split('|');
@@ -890,7 +983,6 @@
         function render() {
             const content = document.getElementById('tab-content');
             
-            // Update Active Nav Styles
             document.querySelectorAll('.nav-btn').forEach(btn => {
                 btn.classList.remove('bg-slate-100', 'text-slate-900', 'shadow-sm', 'text-primary-600');
                 if(btn.id.includes('mobile')) {
@@ -1000,7 +1092,6 @@
                 <div class="h-full flex flex-col gap-6 animate-fade-in">
                     
                     <!-- HEADER CONTROL (Kasir / Tipe Penjualan) -->
-                    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-4 justify-between items-start sm:items-center z-10">
                         <div class="flex flex-col sm:flex-row w-full gap-4 justify-between sm:items-center">
                             <div class="flex items-center gap-3 w-full sm:w-auto">
                                 <div class="bg-slate-100 p-2.5 rounded-xl"><i data-lucide="store" class="text-slate-600 w-5 h-5"></i></div>
@@ -1067,9 +1158,14 @@
                                                 </div>
                                             `).join('')}
                                         </div>
-                                        <button onclick="submitBulkSales()" class="w-full bg-slate-900 text-white text-xs font-bold py-3 rounded-xl hover:bg-slate-800 transition-colors flex justify-center items-center gap-2">
-                                            Simpan Rekap Borongan
-                                        </button>
+                                        <div class="flex gap-2">
+                                            <button onclick="submitBulkSales(false)" class="flex-1 bg-slate-900 text-white text-xs font-bold py-3 rounded-xl hover:bg-slate-800 transition-colors flex justify-center items-center gap-2">
+                                                Simpan Saja
+                                            </button>
+                                            <button onclick="submitBulkSales(true)" class="flex-1 bg-primary-600 text-white text-xs font-bold py-3 rounded-xl hover:bg-primary-700 transition-colors flex justify-center items-center gap-2 shadow-sm">
+                                                <i data-lucide="printer" class="w-4 h-4"></i> Simpan & Cetak Nota
+                                            </button>
+                                        </div>
                                     </div>
                                 </details>
                             </div>
@@ -1114,11 +1210,14 @@
                                             <p class="font-black text-sm text-slate-800">${formatIDR(s.totalOmzet)}</p>
                                             <div class="flex gap-1">
                                                 ${paymentStatus === 'PIUTANG' ? `<button onclick='promptMarkAsPaid(${JSON.stringify(s.ids)})' class="text-[9px] text-emerald-600 font-bold bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded transition-colors flex items-center gap-1"><i data-lucide="check" class="w-3 h-3"></i> Lunasi</button>` : ''}
+                                                <button onclick="printNota('${s.timestamp}')" class="text-[9px] text-slate-700 font-bold bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded transition-colors flex items-center gap-1" title="Cetak Nota (Struk)">
+                                                    <i data-lucide="printer" class="w-3 h-3"></i> Nota
+                                                </button>
                                                 <button onclick='promptEditSale(${JSON.stringify(s.ids)})' class="text-[9px] text-blue-600 font-bold bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded transition-colors flex items-center gap-1">
                                                     <i data-lucide="edit" class="w-3 h-3"></i> Edit
                                                 </button>
                                                 <button onclick="promptDeleteSale(${s.ids[0]})" class="text-[9px] text-red-500 font-bold bg-red-50 hover:bg-red-100 px-2 py-0.5 rounded transition-colors flex items-center gap-1" title="Hapus 1x Transaksi">
-                                                    <i data-lucide="trash-2" class="w-3 h-3"></i> Batal 1x
+                                                    <i data-lucide="trash-2" class="w-3 h-3"></i> Batal
                                                 </button>
                                             </div>
                                         </div>
@@ -1147,7 +1246,7 @@
                 
                 const key = `${vName}_${vSize}_${pMethod}_${pStatus}`;
                 const qty = s.qty || 1;
-                const net = (s.price - (s.resellerProfit || 0)) * qty; // Omzet murni
+                const net = (s.price - (s.resellerProfit || 0)) * qty;
 
                 if(!summary[key]) summary[key] = { name: vName, size: vSize, method: pMethod, status: pStatus, qty: 0, net: 0, ids: [] };
                 
@@ -1161,7 +1260,6 @@
                 if (pStatus === 'PIUTANG') totals.piutang += net;
             });
 
-            // Urutkan berdasarkan qty tertinggi
             const summaryArray = Object.values(summary).sort((a,b) => b.qty - a.qty);
 
             el.innerHTML = `
@@ -1264,7 +1362,6 @@
             const monthlyOverhead = calculateTotalMonthlyOverhead();
             const monthlyDepreciation = calculateMonthlyAssetDepreciation();
             
-            // Kalkulasi proporsional hari untuk biaya tetap
             let daysCount = 1;
             if (state.reportFilter === 'daily') daysCount = 1;
             else if (state.reportFilter === 'weekly') daysCount = 7;
@@ -1280,7 +1377,6 @@
 
             const revenue = reportData.reduce((a, b) => a + (b.price - (b.resellerProfit || 0)), 0);
             
-            // Perhitungan Uang Masuk & Piutang untuk laporan
             let uangMasuk = 0;
             let piutang = 0;
             reportData.forEach(b => {
@@ -1464,7 +1560,7 @@
                         </div>
                     </div>
 
-                    <!-- INFORMASI HPP PRODUK (DIPINDAHKAN DARI DASBOR) -->
+                    <!-- INFORMASI HPP PRODUK -->
                     <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
                         <div class="flex items-center gap-3 mb-4">
                             <div class="p-2 bg-primary-50 rounded-xl"><i data-lucide="calculator" class="text-primary-600 w-5 h-5"></i></div>
@@ -1507,7 +1603,6 @@
                                 </div>
                                 <div class="space-y-3 max-h-[400px] overflow-y-auto pr-2 thin-scrollbar">
                                     ${state.ingredients.map(ing => {
-                                        // Kalkulasi jumlah stok yang dibutuhkan berdasarkan Target Produksi Botol
                                         let maxQtyNeeded = 0;
                                         state.variants.forEach(v => {
                                             const r = v.recipe.find(x => x.ingId === ing.id);
