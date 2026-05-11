@@ -178,109 +178,105 @@
             slate: { 50: '#f8fafc', 100: '#f1f5f9', 200: '#e2e8f0', 300: '#cbd5e1', 400: '#94a3b8', 500: '#64748b', 600: '#475569', 700: '#334155', 800: '#1e293b', 900: '#0f172a' }
         };
 
-        // --- APP STATE ---
+        // --- STATE MANAJEMEN ---
         let state = {
+            theme: localStorage.getItem('mozzart_theme') || 'amber',
+            logoUrl: localStorage.getItem('mozzart_logo') || '',
             isLoggedIn: false,
             activeTab: 'transaksi', 
+            ingredients: [],
+            variants: [],
+            assets: [],
+            opsCosts: [],
+            sales: [],
+            targetQty: 100,
+            modal: { isOpen: false, type: '', title: '', message: '', data: null, onConfirm: null },
             reportFilter: 'daily',
             reportStartDate: new Date().toISOString().split('T')[0],
             reportEndDate: new Date().toISOString().split('T')[0],
             rekapDate: new Date().toISOString().split('T')[0],
+            transaksiDate: new Date().toISOString().split('T')[0],
             editingVariantId: null,
-            selectedSalesChannel: 'direct', 
             selectedPaymentMethod: 'CASH',
             selectedPaymentStatus: 'LUNAS',
-            selectedReportReseller: 'all', 
-            ingredients: [],
-            assets: [],
-            opsCosts: [],
-            resellers: [], 
-            targetQty: 500,
-            variants: [],
-            sales: [],
-            modal: { isOpen: false, type: 'alert', title: '', message: '', onConfirm: null },
-            theme: 'amber',
-            logoUrl: null
+            resellers: [],
+            selectedSalesChannel: 'direct',
+            selectedReportReseller: 'all'
         };
 
-        // --- THEME & LOGO INITS ---
         function initThemeAndLogo() {
-            const storedTheme = localStorage.getItem('mozzart_theme') || 'amber';
-            state.theme = storedTheme;
-            applyTheme(storedTheme);
-            
-            state.logoUrl = localStorage.getItem('mozzart_logo');
-            updateAppUI();
+            changeTheme(state.theme);
+            updateLogoDisplay();
         }
 
-        function applyTheme(colorKey) {
-            const colors = THEMES[colorKey] || THEMES.amber;
-            const root = document.documentElement;
-            for (const [weight, hex] of Object.entries(colors)) {
-                root.style.setProperty(`--primary-${weight}`, hex);
-            }
-        }
-
-        window.changeTheme = (themeName) => {
+        function changeTheme(themeName) {
+            if (!THEMES[themeName]) return;
             state.theme = themeName;
-            applyTheme(themeName);
             localStorage.setItem('mozzart_theme', themeName);
-            render(); 
-        };
-
-        window.handleLogoUpload = (event) => {
-            const file = event.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const base64 = e.target.result;
-                    state.logoUrl = base64;
-                    localStorage.setItem('mozzart_logo', base64);
-                    updateAppUI();
-                    if(state.activeTab === 'pengaturan') render();
-                };
-                reader.readAsDataURL(file);
-            }
-        };
-
-        window.resetLogo = () => {
-            state.logoUrl = null;
-            localStorage.removeItem('mozzart_logo');
-            updateAppUI();
-            if(state.activeTab === 'pengaturan') render();
-        };
-
-        function updateAppUI() {
-            const logoHtmlLarge = state.logoUrl ? `<img src="${state.logoUrl}" class="w-full h-full object-cover rounded-2xl">` : `<i data-lucide="coffee" class="w-8 h-8 text-primary-600"></i>`;
-            const logoHtmlSmall = state.logoUrl ? `<img src="${state.logoUrl}" class="w-7 h-7 object-cover rounded-md border border-slate-200">` : `<i data-lucide="coffee" class="text-primary-600 w-6 h-6"></i>`;
-            const logoHtmlMobile = state.logoUrl ? `<img src="${state.logoUrl}" class="w-5 h-5 object-cover rounded border border-slate-200">` : `<i data-lucide="coffee" class="text-primary-600 w-5 h-5"></i>`;
-            
-            const loginEl = document.getElementById('login-logo-container');
-            const sideEl = document.getElementById('sidebar-logo-container');
-            const mobEl = document.getElementById('mobile-logo-container');
-            
-            if(loginEl) loginEl.innerHTML = logoHtmlLarge;
-            if(sideEl) sideEl.innerHTML = logoHtmlSmall;
-            if(mobEl) mobEl.innerHTML = logoHtmlMobile;
-            
-            lucide.createIcons();
+            const root = document.documentElement;
+            const colors = THEMES[themeName];
+            Object.entries(colors).forEach(([weight, hex]) => {
+                root.style.setProperty(`--primary-${weight}`, hex);
+            });
+            render();
         }
 
-        // --- CUSTOM MODAL UI SYSTEM ---
-        window.showModal = (type, title, message, onConfirm = null) => {
-            state.modal = { isOpen: true, type, title, message, onConfirm };
-            renderModal();
-        };
+        function handleLogoUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                state.logoUrl = event.target.result;
+                localStorage.setItem('mozzart_logo', state.logoUrl);
+                updateLogoDisplay();
+                render();
+            };
+            reader.readAsDataURL(file);
+        }
 
-        window.closeModal = () => {
-            state.modal.isOpen = false;
-            renderModal();
-        };
+        function resetLogo() {
+            state.logoUrl = '';
+            localStorage.removeItem('mozzart_logo');
+            updateLogoDisplay();
+            render();
+        }
 
-        window.confirmModal = () => {
+        function updateLogoDisplay() {
+            const containers = ['login-logo-container', 'sidebar-logo-container', 'mobile-logo-container'];
+            containers.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    if (state.logoUrl) {
+                        el.innerHTML = `<img src="${state.logoUrl}" class="w-full h-full object-cover ${id === 'login-logo-container' ? 'rounded-2xl' : 'rounded-lg'}">`;
+                        if(id !== 'login-logo-container') {
+                            el.classList.add('w-8', 'h-8', 'mr-2', 'overflow-hidden');
+                        }
+                    } else {
+                        el.innerHTML = `<i data-lucide="coffee" class="${id === 'login-logo-container' ? 'w-8 h-8' : 'w-5 h-5'}"></i>`;
+                        if(id !== 'login-logo-container') {
+                            el.classList.remove('w-8', 'h-8', 'mr-2', 'overflow-hidden');
+                            el.classList.add('w-6', 'h-6', 'bg-primary-100', 'text-primary-600', 'rounded-lg', 'mr-2', 'flex', 'items-center', 'justify-center');
+                        }
+                    }
+                }
+            });
+            if(typeof lucide !== 'undefined') lucide.createIcons();
+        }
+
+        function showModal(type, title, message, onConfirm = null) {
+            state.modal = { isOpen: true, type, title, message, data: null, onConfirm };
+            renderModal();
+        }
+
+        function closeModal() {
+            state.modal = { isOpen: false, type: '', title: '', message: '', data: null, onConfirm: null };
+            renderModal();
+        }
+
+        function confirmModal() {
             if (state.modal.onConfirm) state.modal.onConfirm();
-            closeModal();
-        };
+            if (state.modal.type !== 'alert') closeModal();
+        }
 
         function renderModal() {
             const container = document.getElementById('modal-container');
@@ -291,21 +287,20 @@
 
             if (state.modal.type === 'edit_sale') {
                 const ids = state.modal.data.ids;
+                const currentQty = ids.length;
                 const refItem = state.sales.find(s => s.id === ids[0]);
-                if (!refItem) return closeModal();
-                
+                if (!refItem) return;
                 const parts = refItem.name.split('|');
                 const itemName = parts[0];
                 const itemSize = parts[1] || '250 ml';
                 const currentMethod = parts[2] || 'CASH';
                 const currentStatus = parts[3] || 'LUNAS';
-                const currentQty = ids.length;
 
                 container.innerHTML = `
                     <div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-fade-in">
-                        <div class="bg-white rounded-3xl p-6 w-full max-w-sm shadow-xl border border-slate-100">
+                        <div class="bg-white rounded-3xl p-6 w-full max-w-md shadow-xl border border-slate-100">
                             <div class="flex justify-between items-center mb-4">
-                                <h3 class="text-lg font-heading font-bold text-slate-800">Edit Transaksi</h3>
+                                <h3 class="text-lg font-heading font-bold text-slate-800">Edit Penjualan</h3>
                                 <button onclick="closeModal()" class="text-slate-400 hover:text-red-500"><i data-lucide="x" class="w-5 h-5"></i></button>
                             </div>
                             <div class="mb-4 bg-slate-50 p-3 rounded-xl border border-slate-100">
@@ -339,7 +334,7 @@
                         </div>
                     </div>
                 `;
-                lucide.createIcons();
+                if(typeof lucide !== 'undefined') lucide.createIcons();
                 return;
             }
 
@@ -360,7 +355,7 @@
                     </div>
                 </div>
             `;
-            lucide.createIcons();
+            if(typeof lucide !== 'undefined') lucide.createIcons();
         }
 
         // --- FETCH DATA DARI SUPABASE ---
@@ -1086,12 +1081,23 @@
 
         function renderTransaksi(el) {
             const todayISOString = new Date().toISOString().split('T')[0];
-            const groupedSales = getGroupedSales(state.sales.slice(0, 50)); 
+            if(!state.transaksiDate) state.transaksiDate = todayISOString;
+
+            // Filter sales berdasarkan transaksiDate yang dipilih
+            const [fYear, fMonth, fDay] = state.transaksiDate.split('-');
+            const filteredSales = state.sales.filter(s => {
+                const d = new Date(s.timestamp);
+                return d.getFullYear() == fYear && (d.getMonth() + 1) == parseInt(fMonth) && d.getDate() == parseInt(fDay);
+            });
+
+            // Grouping sales yang sudah difilter
+            const groupedSales = getGroupedSales(filteredSales); 
 
             el.innerHTML = `
-                <div class="h-full flex flex-col gap-6 animate-fade-in">
+                <div class="flex flex-col gap-6 animate-fade-in pb-8">
                     
                     <!-- HEADER CONTROL (Kasir / Tipe Penjualan) -->
+                    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-4 justify-between items-start sm:items-center z-10">
                         <div class="flex flex-col sm:flex-row w-full gap-4 justify-between sm:items-center">
                             <div class="flex items-center gap-3 w-full sm:w-auto">
                                 <div class="bg-slate-100 p-2.5 rounded-xl"><i data-lucide="store" class="text-slate-600 w-5 h-5"></i></div>
@@ -1113,117 +1119,112 @@
                         </div>
                     </div>
 
-                    <div class="grid lg:grid-cols-12 gap-6 flex-1">
-                        
-                        <!-- POS KASIR (KIRI) -->
-                        <div class="lg:col-span-7 flex flex-col gap-6">
-                            <!-- INPUT REKAP BORONGAN -->
-                            <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
-                                <details class="group cursor-pointer marker:content-['']" open>
-                                    <summary class="flex justify-between items-center font-heading font-bold text-sm text-slate-800 select-none">
-                                        <div class="flex items-center gap-2"><i data-lucide="layers" class="w-4 h-4 text-primary-500"></i> Input Borongan (Rekap Masal)</div>
-                                        <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 transition duration-300 group-open:-rotate-180"></i>
-                                    </summary>
-                                    <div class="pt-4 mt-4 border-t border-slate-100 cursor-default">
-                                        <div class="grid grid-cols-3 gap-3 mb-4">
-                                            <div>
-                                                <label class="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Tanggal</label>
-                                                <input type="date" id="bulk-date" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-primary-400" value="${todayISOString}">
-                                            </div>
-                                            <div>
-                                                <label class="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Metode</label>
-                                                <select id="bulk-payment" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-primary-400">
-                                                    <option value="CASH">CASH</option>
-                                                    <option value="QRIS">QRIS/TF</option>
-                                                </select>
-                                            </div>
-                                            <div>
-                                                <label class="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Status Dana</label>
-                                                <select id="bulk-status" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-primary-400">
-                                                    <option value="LUNAS">LUNAS</option>
-                                                    <option value="PIUTANG">KASBON</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                        <div class="space-y-2 mb-4 max-h-[450px] overflow-y-auto pr-2 thin-scrollbar">
-                                            ${state.variants.map(v => `
-                                                <div class="flex justify-between items-center bg-slate-50 p-2 rounded-xl">
-                                                    <div class="flex flex-col pr-2">
-                                                        <span class="font-bold text-xs text-slate-700">${v.name}</span>
-                                                        <span class="text-[9px] text-slate-400 font-bold">${v.bottleSize || '250 ml'}</span>
-                                                    </div>
-                                                    <div class="flex items-center bg-white border border-slate-200 rounded-lg overflow-hidden w-20">
-                                                        <input type="number" id="bulk-qty-${v.id}" class="w-full text-center font-black text-slate-800 text-xs py-1.5 outline-none" placeholder="0" min="0">
-                                                    </div>
-                                                </div>
-                                            `).join('')}
-                                        </div>
-                                        <div class="flex gap-2">
-                                            <button onclick="submitBulkSales(false)" class="flex-1 bg-slate-900 text-white text-xs font-bold py-3 rounded-xl hover:bg-slate-800 transition-colors flex justify-center items-center gap-2">
-                                                Simpan Saja
-                                            </button>
-                                            <button onclick="submitBulkSales(true)" class="flex-1 bg-primary-600 text-white text-xs font-bold py-3 rounded-xl hover:bg-primary-700 transition-colors flex justify-center items-center gap-2 shadow-sm">
-                                                <i data-lucide="printer" class="w-4 h-4"></i> Simpan & Cetak Nota
-                                            </button>
-                                        </div>
+                    <!-- INPUT REKAP BORONGAN (FULL WIDTH) -->
+                    <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm w-full">
+                        <details class="group cursor-pointer marker:content-['']" open>
+                            <summary class="flex justify-between items-center font-heading font-bold text-sm text-slate-800 select-none">
+                                <div class="flex items-center gap-2"><i data-lucide="layers" class="w-4 h-4 text-primary-500"></i> Input Borongan (Rekap Masal)</div>
+                                <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 transition duration-300 group-open:-rotate-180"></i>
+                            </summary>
+                            <div class="pt-4 mt-4 border-t border-slate-100 cursor-default">
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
+                                    <div>
+                                        <label class="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Tanggal Transaksi</label>
+                                        <input type="date" id="bulk-date" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-primary-400" value="${todayISOString}">
                                     </div>
-                                </details>
+                                    <div>
+                                        <label class="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Metode</label>
+                                        <select id="bulk-payment" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-primary-400">
+                                            <option value="CASH">CASH</option>
+                                            <option value="QRIS">QRIS/TF</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Status Dana</label>
+                                        <select id="bulk-status" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-primary-400">
+                                            <option value="LUNAS">LUNAS</option>
+                                            <option value="PIUTANG">KASBON</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-5 max-h-[300px] overflow-y-auto pr-2 thin-scrollbar">
+                                    ${state.variants.map(v => `
+                                        <div class="flex justify-between items-center bg-slate-50 p-2 rounded-xl border border-slate-100/50">
+                                            <div class="flex flex-col pr-2">
+                                                <span class="font-bold text-xs text-slate-700">${v.name}</span>
+                                                <span class="text-[9px] text-slate-400 font-bold">${v.bottleSize || '250 ml'}</span>
+                                            </div>
+                                            <div class="flex items-center bg-white border border-slate-200 rounded-lg overflow-hidden w-24 shrink-0 shadow-sm focus-within:border-primary-400 transition-colors">
+                                                <input type="number" id="bulk-qty-${v.id}" class="w-full text-center font-black text-slate-800 text-xs py-1.5 outline-none" placeholder="0" min="0">
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                                <button onclick="submitBulkSales()" class="w-full bg-slate-900 text-white text-sm font-bold py-3.5 rounded-xl hover:bg-slate-800 transition-colors flex justify-center items-center gap-2 shadow-md">
+                                    Simpan Transaksi
+                                </button>
+                            </div>
+                        </details>
+                    </div>
+
+                    <!-- RIWAYAT PENJUALAN (FILTER TANGGAL) -->
+                    <div class="bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col w-full overflow-hidden">
+                        <div class="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-slate-50/50 gap-3">
+                            <h3 class="font-heading font-bold text-sm flex items-center gap-2"><i data-lucide="history" class="w-4 h-4 text-slate-400"></i> Transaksi Terkini</h3>
+                            <div class="flex items-center gap-2 w-full sm:w-auto">
+                                <div class="flex items-center bg-white border border-slate-200 rounded-xl px-3 py-1.5 flex-1 sm:flex-none shadow-sm focus-within:border-primary-400 transition-colors">
+                                    <i data-lucide="calendar" class="w-4 h-4 text-slate-400 mr-2"></i>
+                                    <input type="date" class="w-full bg-transparent text-xs font-bold outline-none text-slate-700 cursor-pointer" value="${state.transaksiDate}" onchange="state.transaksiDate = this.value; render();">
+                                </div>
+                                <button onclick="promptReset('sales')" class="text-[10px] px-3 py-2 bg-red-50 text-red-500 rounded-xl font-bold hover:bg-red-100 transition-colors shrink-0">Reset</button>
                             </div>
                         </div>
-
-                        <!-- RIWAYAT PENJUALAN (KANAN) -->
-                        <div class="lg:col-span-5 bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col overflow-hidden h-[500px] lg:h-auto">
-                            <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                                <h3 class="font-heading font-bold text-sm flex items-center gap-2"><i data-lucide="history" class="w-4 h-4 text-slate-400"></i> Transaksi Terkini</h3>
-                                <button onclick="promptReset('sales')" class="text-[10px] px-2 py-1 bg-red-50 text-red-500 rounded font-bold hover:bg-red-100 transition-colors">Reset</button>
-                            </div>
-                            <div class="flex-1 overflow-y-auto p-2 space-y-1 thin-scrollbar">
-                                ${groupedSales.length === 0 ? '<div class="h-full flex flex-col items-center justify-center text-slate-300"><i data-lucide="receipt" class="w-10 h-10 mb-2 opacity-50"></i><p class="text-xs font-medium">Belum ada transaksi</p></div>' : 
-                                    groupedSales.map(s => {
-                                    const isReseller = s.resellerId != null;
-                                    const nameParts = s.name.split('|');
-                                    const displayName = nameParts[0];
-                                    const displaySize = nameParts[1] || '';
-                                    const paymentMethod = nameParts[2] || 'CASH';
-                                    const paymentStatus = s.paymentStatus || 'LUNAS';
-                                    
-                                    return `
-                                    <div class="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100 ${paymentStatus === 'PIUTANG' ? 'bg-red-50/30' : ''}">
-                                        <div class="flex gap-3 items-center">
-                                            <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black ${isReseller ? 'bg-purple-100 text-purple-600' : 'bg-slate-100 text-slate-600'}">
-                                                ${s.qty}x
-                                            </div>
-                                            <div>
-                                                <div class="flex items-center gap-1.5 mb-1">
-                                                    <p class="font-bold text-xs text-slate-800 line-clamp-1">${displayName}</p>
-                                                    <span class="text-[8px] font-bold px-1.5 py-0.5 rounded ${paymentStatus === 'PIUTANG' ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'}">${paymentStatus === 'PIUTANG' ? 'KASBON' : 'LUNAS'}</span>
-                                                </div>
-                                                <div class="flex items-center gap-1.5 text-[9px] font-semibold text-slate-400">
-                                                    <span>${displaySize}</span>
-                                                    <span class="w-1 h-1 rounded-full bg-slate-300"></span>
-                                                    <span class="${paymentMethod === 'QRIS' ? 'text-blue-500' : 'text-emerald-500'}">${paymentMethod}</span>
-                                                    ${isReseller ? `<span class="w-1 h-1 rounded-full bg-slate-300"></span><span class="text-purple-500">Reseller</span>` : ''}
-                                                </div>
-                                            </div>
+                        <div class="p-5 bg-slate-50/30">
+                            ${groupedSales.length === 0 ? '<div class="py-12 flex flex-col items-center justify-center text-slate-300"><i data-lucide="receipt" class="w-12 h-12 mb-3 opacity-50"></i><p class="text-sm font-medium">Tidak ada transaksi di tanggal ini</p></div>' : 
+                                `<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                ${groupedSales.map(s => {
+                                const isReseller = s.resellerId != null;
+                                const nameParts = s.name.split('|');
+                                const displayName = nameParts[0];
+                                const displaySize = nameParts[1] || '';
+                                const paymentMethod = nameParts[2] || 'CASH';
+                                const paymentStatus = s.paymentStatus || 'LUNAS';
+                                
+                                return `
+                                <div class="flex items-center justify-between p-4 rounded-2xl bg-white border hover:border-slate-300 transition-all shadow-sm ${paymentStatus === 'PIUTANG' ? 'border-red-200 bg-red-50/20' : 'border-slate-100'}">
+                                    <div class="flex gap-4 items-center overflow-hidden pr-2">
+                                        <div class="w-12 h-12 rounded-xl flex items-center justify-center text-sm font-black shrink-0 ${isReseller ? 'bg-purple-100 text-purple-600' : 'bg-slate-100 text-slate-600'}">
+                                            ${s.qty}x
                                         </div>
-                                        <div class="text-right flex flex-col items-end gap-1.5">
-                                            <p class="font-black text-sm text-slate-800">${formatIDR(s.totalOmzet)}</p>
-                                            <div class="flex gap-1">
-                                                ${paymentStatus === 'PIUTANG' ? `<button onclick='promptMarkAsPaid(${JSON.stringify(s.ids)})' class="text-[9px] text-emerald-600 font-bold bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded transition-colors flex items-center gap-1"><i data-lucide="check" class="w-3 h-3"></i> Lunasi</button>` : ''}
-                                                <button onclick="printNota('${s.timestamp}')" class="text-[9px] text-slate-700 font-bold bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded transition-colors flex items-center gap-1" title="Cetak Nota (Struk)">
-                                                    <i data-lucide="printer" class="w-3 h-3"></i> Nota
-                                                </button>
-                                                <button onclick='promptEditSale(${JSON.stringify(s.ids)})' class="text-[9px] text-blue-600 font-bold bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded transition-colors flex items-center gap-1">
-                                                    <i data-lucide="edit" class="w-3 h-3"></i> Edit
-                                                </button>
-                                                <button onclick="promptDeleteSale(${s.ids[0]})" class="text-[9px] text-red-500 font-bold bg-red-50 hover:bg-red-100 px-2 py-0.5 rounded transition-colors flex items-center gap-1" title="Hapus 1x Transaksi">
-                                                    <i data-lucide="trash-2" class="w-3 h-3"></i> Batal
-                                                </button>
+                                        <div class="min-w-0">
+                                            <div class="flex items-center gap-2 mb-1.5">
+                                                <p class="font-bold text-sm text-slate-800 truncate">${displayName}</p>
+                                                <span class="shrink-0 text-[9px] font-bold px-2 py-0.5 rounded-md ${paymentStatus === 'PIUTANG' ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'}">${paymentStatus === 'PIUTANG' ? 'KASBON' : 'LUNAS'}</span>
+                                            </div>
+                                            <div class="flex items-center flex-wrap gap-2 text-[10px] font-semibold text-slate-400">
+                                                <span class="whitespace-nowrap text-slate-600">${displaySize}</span>
+                                                <span class="w-1 h-1 rounded-full bg-slate-300 hidden sm:block"></span>
+                                                <span class="flex items-center gap-1 ${paymentMethod === 'QRIS' ? 'text-blue-500' : 'text-emerald-500'}"><i data-lucide="${paymentMethod === 'QRIS' ? 'qr-code' : 'banknote'}" class="w-3 h-3"></i>${paymentMethod}</span>
+                                                ${isReseller ? `<span class="w-1 h-1 rounded-full bg-slate-300"></span><span class="text-purple-500 flex items-center gap-1"><i data-lucide="store" class="w-3 h-3"></i> Reseller</span>` : ''}
                                             </div>
                                         </div>
                                     </div>
-                                    `}).join('')}
-                            </div>
+                                    <div class="text-right flex flex-col items-end gap-2 shrink-0">
+                                        <p class="font-black text-base text-slate-800">${formatIDR(s.totalOmzet)}</p>
+                                        <div class="flex gap-1.5">
+                                            ${paymentStatus === 'PIUTANG' ? `<button onclick='promptMarkAsPaid(${JSON.stringify(s.ids)})' class="text-[10px] text-emerald-600 font-bold bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1"><i data-lucide="check" class="w-3.5 h-3.5"></i> Lunasi</button>` : ''}
+                                            <button onclick='promptEditSale(${JSON.stringify(s.ids)})' class="text-[10px] text-blue-600 font-bold bg-blue-50 hover:bg-blue-100 px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1">
+                                                <i data-lucide="edit" class="w-3.5 h-3.5"></i> Edit
+                                            </button>
+                                            <button onclick="promptDeleteSale(${s.ids[0]})" class="text-[10px] text-red-500 font-bold bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1" title="Hapus 1x Transaksi">
+                                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Batal
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                `}).join('')}
+                                </div>`
+                            }
                         </div>
                     </div>
                 </div>
@@ -1590,88 +1591,99 @@
                         </div>
                     </div>
 
+                    <!-- GUDANG BAHAN (DIPERLUAS FULL WIDTH) -->
+                    <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm mb-6">
+                        <div class="flex justify-between items-center mb-5">
+                            <div>
+                                <h3 class="font-bold text-sm flex items-center gap-2 text-slate-800"><i data-lucide="package" class="w-5 h-5 text-emerald-500"></i> Gudang Bahan Baku</h3>
+                                <p class="text-[10px] text-slate-500 mt-1">Kelola stok dan harga modal bahan baku tanpa perlu scroll ke samping.</p>
+                            </div>
+                            <button onclick="addIngredient()" class="text-xs bg-emerald-50 px-3 py-2 rounded-xl font-bold text-emerald-600 hover:bg-emerald-100 transition-colors flex items-center gap-1.5"><i data-lucide="plus" class="w-4 h-4"></i> Tambah Bahan</button>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                            ${state.ingredients.map(ing => {
+                                let maxQtyNeeded = 0;
+                                state.variants.forEach(v => {
+                                    const r = v.recipe.find(x => x.ingId === ing.id);
+                                    if (r && r.qty > maxQtyNeeded) maxQtyNeeded = r.qty;
+                                });
+                                const requiredStock = maxQtyNeeded * state.targetQty;
+                                const toBuy = Math.max(0, requiredStock - ing.bulkAmount);
+                                
+                                return `
+                                <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100 relative group">
+                                    <button onclick="delIng(${ing.id})" class="absolute top-3 right-3 text-slate-300 hover:text-red-500 transition-colors"><i data-lucide="x" class="w-4 h-4"></i></button>
+                                    
+                                    <div class="flex flex-col gap-3 pr-6 mb-4">
+                                        <div>
+                                            <label class="text-[9px] font-bold text-slate-400 uppercase mb-1 block">Nama Bahan</label>
+                                            <input class="w-full bg-white text-sm font-bold outline-none text-slate-800 border border-slate-200 focus:border-emerald-400 rounded-lg px-3 py-1.5 transition-colors shadow-sm" value="${ing.name}" onchange="updateIng(${ing.id}, 'name', this.value)" placeholder="Misal: Biji Kopi Arabica">
+                                        </div>
+                                        <div class="flex gap-2">
+                                            <div class="flex-1">
+                                                <label class="text-[9px] font-bold text-slate-400 uppercase mb-1 block">Total Harga Beli</label>
+                                                <div class="flex items-center bg-white border border-slate-200 rounded-lg overflow-hidden shrink-0 shadow-sm focus-within:border-emerald-400 transition-colors">
+                                                    <span class="text-[10px] font-bold text-slate-400 pl-2">Rp</span>
+                                                    <input type="number" class="w-full text-right px-2 py-1.5 text-xs outline-none font-bold text-slate-700" value="${ing.cost}" onchange="updateIng(${ing.id}, 'cost', parseFloat(this.value))" placeholder="0">
+                                                </div>
+                                            </div>
+                                            <div class="w-1/3">
+                                                <label class="text-[9px] font-bold text-slate-400 uppercase mb-1 block">Satuan</label>
+                                                <select class="w-full bg-white border border-slate-200 text-xs py-1.5 px-2 outline-none font-bold text-slate-600 rounded-lg shadow-sm" onchange="updateIng(${ing.id}, 'unit', this.value)">
+                                                    <option value="g" ${ing.unit==='g'?'selected':''}>Gram (g)</option><option value="ml" ${ing.unit==='ml'?'selected':''}>Mili (ml)</option><option value="pcs" ${ing.unit==='pcs'?'selected':''}>Pcs</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="grid grid-cols-3 gap-2">
+                                        <div class="bg-white p-2 rounded-xl border border-slate-200 text-center shadow-sm">
+                                            <p class="text-[8px] font-bold text-slate-400 uppercase">Stok Tersedia</p>
+                                            <p class="text-sm font-black text-slate-700 mt-0.5">${ing.bulkAmount} <span class="font-normal text-[9px] text-slate-500">${ing.unit}</span></p>
+                                        </div>
+                                        <div class="bg-primary-50 p-2 rounded-xl border border-primary-200 flex flex-col justify-center items-center shadow-sm">
+                                            <p class="text-[8px] font-bold text-primary-600 uppercase mb-1">Baru Dibeli</p>
+                                            <div class="flex w-full h-7">
+                                                <input type="number" id="add-stock-${ing.id}" class="w-full text-center text-[10px] font-bold outline-none rounded-l-lg border border-primary-300 focus:border-primary-500" placeholder="+ 0">
+                                                <button onclick="addStock(${ing.id})" class="bg-primary-600 text-white px-2.5 rounded-r-lg hover:bg-primary-700 transition-colors flex items-center justify-center shadow-sm"><i data-lucide="plus" class="w-3 h-3"></i></button>
+                                            </div>
+                                        </div>
+                                        <div class="bg-red-50 p-2 rounded-xl border border-red-200 text-center shadow-sm" title="Berdasarkan Target Produksi: ${state.targetQty} btl">
+                                            <p class="text-[8px] font-bold text-red-500 uppercase">Harus Dibeli</p>
+                                            <p class="text-sm font-black text-red-700 mt-0.5">${toBuy} <span class="font-normal text-[9px] text-red-500">${ing.unit}</span></p>
+                                        </div>
+                                    </div>
+                                </div>
+                            `}).join('')}
+                        </div>
+                    </div>
+
                     <!-- MASTER TABS/CARDS COMPACT -->
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         
-                        <!-- GUDANG & ASET -->
-                        <div class="space-y-4">
-                            <!-- BAHAN -->
-                            <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
-                                <div class="flex justify-between items-center mb-4">
-                                    <h3 class="font-bold text-sm flex items-center gap-2"><i data-lucide="package" class="w-4 h-4 text-emerald-500"></i> Gudang Bahan</h3>
-                                    <button onclick="addIngredient()" class="text-[10px] bg-slate-100 px-2 py-1 rounded font-bold text-slate-600 hover:bg-slate-200">+ Tambah Bahan</button>
-                                </div>
-                                <div class="space-y-3 max-h-[400px] overflow-y-auto pr-2 thin-scrollbar">
-                                    ${state.ingredients.map(ing => {
-                                        let maxQtyNeeded = 0;
-                                        state.variants.forEach(v => {
-                                            const r = v.recipe.find(x => x.ingId === ing.id);
-                                            if (r && r.qty > maxQtyNeeded) maxQtyNeeded = r.qty;
-                                        });
-                                        const requiredStock = maxQtyNeeded * state.targetQty;
-                                        const toBuy = Math.max(0, requiredStock - ing.bulkAmount);
-                                        
-                                        return `
-                                        <div class="bg-slate-50 p-3 rounded-xl border border-slate-100 relative">
-                                            <button onclick="delIng(${ing.id})" class="absolute top-2 right-2 text-slate-300 hover:text-red-500"><i data-lucide="x" class="w-3 h-3"></i></button>
-                                            
-                                            <div class="flex gap-2 pr-6 mb-2">
-                                                <input class="flex-1 bg-transparent text-xs font-bold outline-none" value="${ing.name}" onchange="updateIng(${ing.id}, 'name', this.value)" placeholder="Nama Bahan">
-                                                <div class="flex items-center bg-white border border-slate-200 rounded overflow-hidden shrink-0">
-                                                    <span class="text-[9px] text-slate-400 pl-1.5">Rp</span>
-                                                    <input type="number" class="w-20 text-right px-1.5 py-1 text-[10px] outline-none font-bold" value="${ing.cost}" onchange="updateIng(${ing.id}, 'cost', parseFloat(this.value))" title="Total Harga Modal">
-                                                </div>
-                                                <select class="bg-white border border-slate-200 text-[10px] px-1 outline-none font-bold text-slate-600 rounded shrink-0" onchange="updateIng(${ing.id}, 'unit', this.value)">
-                                                    <option value="g" ${ing.unit==='g'?'selected':''}>g</option><option value="ml" ${ing.unit==='ml'?'selected':''}>ml</option><option value="pcs" ${ing.unit==='pcs'?'selected':''}>pcs</option>
-                                                </select>
-                                            </div>
-                                            
-                                            <div class="grid grid-cols-3 gap-2">
-                                                <div class="bg-white p-1.5 rounded-lg border border-slate-200 text-center">
-                                                    <p class="text-[7px] font-bold text-slate-400 uppercase">Stok Tersedia</p>
-                                                    <p class="text-xs font-black text-slate-700">${ing.bulkAmount} <span class="font-normal text-[8px]">${ing.unit}</span></p>
-                                                </div>
-                                                <div class="bg-primary-50 p-1.5 rounded-lg border border-primary-200 flex flex-col justify-center items-center">
-                                                    <p class="text-[7px] font-bold text-primary-600 uppercase mb-0.5">Baru Dibeli</p>
-                                                    <div class="flex w-full h-5">
-                                                        <input type="number" id="add-stock-${ing.id}" class="w-full text-center text-[10px] font-bold outline-none rounded-l border border-primary-300" placeholder="+ 0">
-                                                        <button onclick="addStock(${ing.id})" class="bg-primary-600 text-white px-2 rounded-r hover:bg-primary-700 transition-colors flex items-center justify-center"><i data-lucide="plus" class="w-3 h-3"></i></button>
-                                                    </div>
-                                                </div>
-                                                <div class="bg-red-50 p-1.5 rounded-lg border border-red-200 text-center" title="Berdasarkan Target Produksi: ${state.targetQty} btl">
-                                                    <p class="text-[7px] font-bold text-red-500 uppercase">Harus Dibeli</p>
-                                                    <p class="text-xs font-black text-red-700">${toBuy} <span class="font-normal text-[8px]">${ing.unit}</span></p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    `}).join('')}
-                                </div>
+                        <!-- OVERHEAD & ASET COMPACT -->
+                        <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex flex-col sm:flex-row gap-6 h-fit">
+                            <div class="flex-1">
+                                <h3 class="font-bold text-sm mb-3 text-slate-700 flex items-center gap-2"><i data-lucide="zap" class="w-4 h-4 text-red-500"></i> Ops Tetap (Bulan)</h3>
+                                ${state.opsCosts.map(ops => `
+                                    <div class="flex gap-2 mb-2">
+                                        <input class="w-1/2 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold outline-none focus:border-red-300" value="${ops.name}" onchange="updateOpsCost(${ops.id}, 'name', this.value)" placeholder="Nama Biaya">
+                                        <input type="number" class="w-1/2 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold outline-none focus:border-red-300" value="${ops.monthly}" onchange="updateOpsCost(${ops.id}, 'monthly', parseFloat(this.value))" placeholder="Nominal">
+                                    </div>
+                                `).join('')}
+                                <button onclick="addOps()" class="text-[10px] text-blue-500 font-bold mt-2 hover:underline inline-flex items-center gap-1"><i data-lucide="plus" class="w-3 h-3"></i> Tambah Ops</button>
                             </div>
-                            
-                            <!-- OVERHEAD & ASET COMPACT -->
-                            <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex gap-4">
-                                <div class="flex-1">
-                                    <h3 class="font-bold text-xs mb-2 text-slate-600">Ops Tetap (Bulan)</h3>
-                                    ${state.opsCosts.map(ops => `
-                                        <div class="flex gap-1 mb-1">
-                                            <input class="w-1/2 bg-slate-50 border border-slate-100 rounded px-1.5 py-1 text-[9px] outline-none" value="${ops.name}" onchange="updateOpsCost(${ops.id}, 'name', this.value)">
-                                            <input type="number" class="w-1/2 bg-slate-50 border border-slate-100 rounded px-1.5 py-1 text-[9px] outline-none" value="${ops.monthly}" onchange="updateOpsCost(${ops.id}, 'monthly', parseFloat(this.value))">
-                                        </div>
-                                    `).join('')}
-                                    <button onclick="addOps()" class="text-[9px] text-blue-500 font-bold mt-1 hover:underline">+ Tambah</button>
-                                </div>
-                                <div class="w-px bg-slate-100"></div>
-                                <div class="flex-1">
-                                    <h3 class="font-bold text-xs mb-2 text-slate-600">Aset (Depresiasi)</h3>
-                                    ${state.assets.map(a => `
-                                        <div class="flex gap-1 mb-1">
-                                            <input class="w-1/2 bg-slate-50 border border-slate-100 rounded px-1.5 py-1 text-[9px] outline-none" value="${a.name}" onchange="updateAsset(${a.id}, 'name', this.value)">
-                                            <input type="number" class="w-1/4 bg-slate-50 border border-slate-100 rounded px-1 text-[9px] outline-none" value="${a.cost}" title="Harga Beli" onchange="updateAsset(${a.id}, 'cost', parseFloat(this.value))">
-                                            <input type="number" class="w-1/4 bg-slate-50 border border-slate-100 rounded px-1 text-[9px] outline-none" value="${a.lifeYears}" title="Tahun" onchange="updateAsset(${a.id}, 'lifeYears', parseFloat(this.value))">
-                                        </div>
-                                    `).join('')}
-                                    <button onclick="addAsset()" class="text-[9px] text-blue-500 font-bold mt-1 hover:underline">+ Tambah</button>
-                                </div>
+                            <div class="hidden sm:block w-px bg-slate-100"></div>
+                            <div class="flex-1">
+                                <h3 class="font-bold text-sm mb-3 text-slate-700 flex items-center gap-2"><i data-lucide="monitor" class="w-4 h-4 text-primary-500"></i> Aset (Depresiasi)</h3>
+                                ${state.assets.map(a => `
+                                    <div class="flex gap-2 mb-2">
+                                        <input class="w-1/2 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold outline-none focus:border-primary-300" value="${a.name}" onchange="updateAsset(${a.id}, 'name', this.value)" placeholder="Nama Aset">
+                                        <input type="number" class="w-1/4 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-semibold outline-none focus:border-primary-300" value="${a.cost}" title="Harga Beli" onchange="updateAsset(${a.id}, 'cost', parseFloat(this.value))" placeholder="Harga">
+                                        <input type="number" class="w-1/4 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-semibold outline-none focus:border-primary-300" value="${a.lifeYears}" title="Tahun" onchange="updateAsset(${a.id}, 'lifeYears', parseFloat(this.value))" placeholder="Thn">
+                                    </div>
+                                `).join('')}
+                                <button onclick="addAsset()" class="text-[10px] text-blue-500 font-bold mt-2 hover:underline inline-flex items-center gap-1"><i data-lucide="plus" class="w-3 h-3"></i> Tambah Aset</button>
                             </div>
                         </div>
 
@@ -1722,6 +1734,15 @@
                         </div>
                     </div>
 
+                    <!-- PEMELIHARAAN DATA (RETROAKTIF HPP) -->
+                    <div class="bg-blue-50 p-4 rounded-2xl border border-blue-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                        <div>
+                            <h4 class="font-bold text-xs text-blue-800">Sinkronisasi Harga Modal (HPP) Retroaktif</h4>
+                            <p class="text-[9px] text-blue-600 mt-0.5">Hitung ulang laba/rugi transaksi masa lalu menggunakan harga bahan baku & resep terbaru.</p>
+                        </div>
+                        <button onclick="promptSyncHPP()" class="px-4 py-2 bg-blue-600 rounded-lg text-xs font-bold text-white hover:bg-blue-700 transition-colors shadow-sm whitespace-nowrap flex items-center gap-1.5"><i data-lucide="refresh-cw" class="w-3 h-3"></i> Update Semua HPP</button>
+                    </div>
+
                     <!-- DANGER ZONE -->
                     <div class="bg-red-50 p-4 rounded-2xl border border-red-100 flex justify-between items-center">
                         <div>
@@ -1738,6 +1759,47 @@
         }
 
         // --- SISTEM RESET & CRUD ---
+        window.promptSyncHPP = () => {
+            showModal('confirm', 'Sinkronisasi HPP Retroaktif?', 'Fitur ini akan menghitung ulang modal bahan baku untuk SEMUA riwayat transaksi menggunakan harga bahan & resep terbaru. Laporan Laba Rugi masa lalu akan berubah menyesuaikan modal baru. Lanjutkan?', () => executeSyncHPP());
+        };
+
+        window.executeSyncHPP = async () => {
+            showModal('alert', 'Memproses...', 'Menghitung ulang HPP semua transaksi...');
+            try {
+                let updates = [];
+                state.sales.forEach(s => {
+                    const parts = s.name.split('|');
+                    const vName = parts[0];
+                    const vSize = parts[1] || '250 ml';
+                    
+                    const variant = state.variants.find(v => v.name === vName && (v.bottleSize || '250 ml') === vSize);
+                    
+                    if (variant) {
+                        const m = calculateVariantMetrics(variant);
+                        if (s.recordedIngredientCost !== m.ingredientCostOnly) {
+                            s.recordedIngredientCost = m.ingredientCostOnly;
+                            updates.push({ id: s.id, recordedIngredientCost: m.ingredientCostOnly });
+                        }
+                    }
+                });
+
+                if (updates.length === 0) {
+                    setTimeout(() => showModal('alert', 'Selesai', 'Tidak ada perbedaan. Semua transaksi sudah menggunakan HPP bahan terbaru.'), 300);
+                    return;
+                }
+
+                // Batch update ke Supabase
+                for (let u of updates) {
+                    await supabaseClient.from('sales').update({ recordedIngredientCost: u.recordedIngredientCost }).eq('id', u.id);
+                }
+
+                render();
+                setTimeout(() => showModal('alert', 'Berhasil', `HPP untuk ${updates.length} transaksi berhasil diperbarui sesuai harga bahan & resep terbaru.`), 300);
+            } catch (error) {
+                showModal('alert', 'Gagal', 'Terjadi kesalahan saat sinkronisasi ke server.');
+            }
+        };
+
         window.promptReset = (type) => {
             let targetName = type === 'sales' ? "Seluruh Riwayat Penjualan" : "Seluruh Data Aplikasi";
             showModal('confirm', 'Hapus ' + targetName + '?', 'Tindakan ini permanen. Semua data penjualan akan direset. Lanjutkan?', () => executeReset(type));
